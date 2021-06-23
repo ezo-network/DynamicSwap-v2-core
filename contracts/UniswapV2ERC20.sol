@@ -6,8 +6,15 @@ import './libraries/SafeMath.sol';
 contract UniswapV2ERC20 is IUniswapV2ERC20 {
     using SafeMath for uint;
 
-    string public constant name = 'Uniswap V2';
-    string public constant symbol = 'UNI-V2';
+    //address public factory;
+    uint public rewardTokens;
+    uint lastUpdate;
+    uint totalWeight;
+    mapping(address => uint) public stakingStart;
+    mapping(address => uint) public stakingWeight;
+
+    string public constant name = 'bSwap V2';
+    string public constant symbol = 'bSwap-V2';
     uint8 public constant decimals = 18;
     uint  public totalSupply;
     mapping(address => uint) public balanceOf;
@@ -37,13 +44,47 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
         );
     }
 
+    function _updateTotalWeight() internal {
+        uint _lastUpdate = lastUpdate;
+        if (_lastUpdate < block.timestamp) {
+            totalWeight = totalWeight.add(
+                (block.timestamp.sub(_lastUpdate))  // time interval
+                .mul(totalSupply.sub(balanceOf[address(0)])) // total supply without address(0) balance
+            );
+            lastUpdate = block.timestamp;
+        }
+    }
+    
+    function _getWeight(address user) internal view returns (uint weight) {
+        uint start = stakingStart[user];
+        if (start != 0) {
+            weight = stakingWeight[user].add(
+                (block.timestamp.sub(start))    // time interval
+                .mul(balanceOf[user])
+            );
+        }
+    }
+
     function _mint(address to, uint value) internal {
+        _updateTotalWeight();
+        if (to != address(0)) {
+            stakingWeight[to] = _getWeight(to);
+            stakingStart[to] = block.timestamp;
+        }
         totalSupply = totalSupply.add(value);
         balanceOf[to] = balanceOf[to].add(value);
         emit Transfer(address(0), to, value);
     }
 
-    function _burn(address from, uint value) internal {
+    function _burn(address from, uint value) internal returns (uint rewardAmount) {
+        _updateTotalWeight();
+        uint weight = _getWeight(from);
+        uint unstake = weight.mul(value) / balanceOf[from]; // unstake weight is proportional of value
+        stakingWeight[from] = weight.sub(unstake);
+        stakingStart[from] = block.timestamp;
+        rewardAmount = rewardTokens.mul(unstake) / totalWeight;
+        rewardTokens = rewardTokens.sub(rewardAmount);
+        totalWeight = totalWeight.sub(unstake);
         balanceOf[from] = balanceOf[from].sub(value);
         totalSupply = totalSupply.sub(value);
         emit Transfer(from, address(0), value);
@@ -55,10 +96,33 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
     }
 
     function _transfer(address from, address to, uint value) private {
+        require(to == address(this), "Remove liquidity allowed only");
+        _updateTotalWeight();
+        uint weight = _getWeight(from);
+        uint transferWeight = weight.mul(value) / balanceOf[from]; // transferWeight is proportional of transferring value
+        stakingWeight[from] = weight - transferWeight;
+        stakingStart[from] = block.timestamp;
+        stakingWeight[to] = _getWeight(to) + transferWeight;
+        stakingStart[to] = block.timestamp;
+
         balanceOf[from] = balanceOf[from].sub(value);
         balanceOf[to] = balanceOf[to].add(value);
         emit Transfer(from, to, value);
     }
+
+    function getRewards(address user) external view returns (uint) {
+        uint _totalWeight = totalWeight.add(
+            (block.timestamp.sub(lastUpdate))  // time interval
+            .mul(totalSupply.sub(balanceOf[address(0)])) // total supply without address(0) balance
+        );
+        uint weight = stakingWeight[user].add(
+            (block.timestamp.sub(stakingStart[user]))    // time interval
+            .mul(balanceOf[user])
+        );
+        return rewardTokens.mul(weight) / _totalWeight;
+    }
+
+
 
     function approve(address spender, uint value) external returns (bool) {
         _approve(msg.sender, spender, value);

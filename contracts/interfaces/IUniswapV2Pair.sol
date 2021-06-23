@@ -48,5 +48,10 @@ interface IUniswapV2Pair {
     function skim(address to) external;
     function sync() external;
 
-    function initialize(address, address) external;
+    function initialize(address, address, uint32[8] calldata, uint8) external;
+
+    function addReward(uint amount) external;
+    function getRewards(address user) external view returns (uint);
+    function getAmountOut(uint amountIn, address tokenIn, address tokenOut) external view returns(uint);
+    function getAmountIn(uint amountOut, address tokenIn, address tokenOut) external view returns(uint);
 }

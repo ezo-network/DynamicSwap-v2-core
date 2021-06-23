@@ -1,4 +1,4 @@
-import chai, { expect } from 'chai'
+/*import chai, { expect } from 'chai'
 import { Contract } from 'ethers'
 import { AddressZero } from 'ethers/constants'
 import { bigNumberify } from 'ethers/utils'
@@ -65,6 +65,7 @@ describe('UniswapV2Factory', () => {
     await createPair(TEST_ADDRESSES.slice().reverse() as [string, string])
   })
 
+  
   it('createPair:gas', async () => {
     const tx = await factory.createPair(...TEST_ADDRESSES)
     const receipt = await tx.wait()
@@ -84,3 +85,4 @@ describe('UniswapV2Factory', () => {
     await expect(factory.setFeeToSetter(wallet.address)).to.be.revertedWith('UniswapV2: FORBIDDEN')
   })
 })
+*/
