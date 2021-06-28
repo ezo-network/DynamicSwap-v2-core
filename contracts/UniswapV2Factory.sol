@@ -2,14 +2,17 @@ pragma solidity =0.5.16;
 
 import './interfaces/IUniswapV2Router02.sol';
 import './interfaces/IUniswapV2Factory.sol';
+import './interfaces/IERC20.sol';
 import './interfaces/IWETH.sol';
-import './UniswapV2Pair.sol';
+import './libraries/Clones.sol';
+import './interfaces/IUniswapV2Pair.sol';
+//import './UniswapV2Pair.sol';
 
 interface ISmart {
     function requestCompensation(address user, uint256 feeAmount) external returns(bool);
 }
 
-contract UniswapV2Factory is IUniswapV2Factory {
+contract BswapV2Factory is IUniswapV2Factory {
     enum Vars {timeFrame, maxDump0, maxDump1, maxTxDump0, maxTxDump1, coefficient, minimalFee, periodMA}
     uint32[8] public vars; // timeFrame, maxDump0, maxDump1, maxTxDump0, maxTxDump1, coefficient, minimalFee, periodMA
     //timeFrame = 1 days;  // during this time frame rate of reserve1/reserve0 should be in range [baseLinePrice0*(1-maxDump0), baseLinePrice0*(1+maxDump1)]
@@ -23,6 +26,7 @@ contract UniswapV2Factory is IUniswapV2Factory {
     address public bswap;   // bSwap token address
     address public uniV2Router; // uniswap compatible router
     address public compensator; // address of users reimbursements contract
+    address public pairImplementation;  // pair implementation code contract (using in clone).
     address public feeTo;
     uint32 public feeToPart = 20; // company part of charged fee (in percentage). I.e. send to `feeTo` amount of (charged fee * feeToPart / 100)
     address public feeToSetter;
@@ -33,9 +37,10 @@ contract UniswapV2Factory is IUniswapV2Factory {
 
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
 
-    constructor(address _feeToSetter) public {
-        require(_feeToSetter != address(0), "Address zero");
+    constructor(address _feeToSetter, address _pairImplementation) public {
+        require(_feeToSetter != address(0) && _pairImplementation != address(0), "Address zero");
         feeToSetter = _feeToSetter;
+        pairImplementation = _pairImplementation;
         vars = [1 days, 100, 100, 100, 100, 100, 1, 45 minutes];
     }
 
@@ -44,17 +49,27 @@ contract UniswapV2Factory is IUniswapV2Factory {
     }
 
     function createPair(address tokenA, address tokenB) external returns (address pair) {
+        return _createPair(tokenA, tokenB, uint8(0));
+    }
+    
+    function createPrivatePair(address tokenA, address tokenB) external returns (address pair) {
+        require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        return _createPair(tokenA, tokenB, uint8(1));
+    }
+
+    function _createPair(address tokenA, address tokenB, uint8 isPrivate) internal returns (address pair) {
         require(tokenA != tokenB, 'UniswapV2: IDENTICAL_ADDRESSES');
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), 'UniswapV2: ZERO_ADDRESS');
         require(getPair[token0][token1] == address(0), 'UniswapV2: PAIR_EXISTS'); // single check is sufficient
-        bytes memory bytecode = type(UniswapV2Pair).creationCode;
         bytes32 salt = keccak256(abi.encodePacked(token0, token1));
+        /*
+        bytes memory bytecode = type(UniswapV2Pair).creationCode;
         assembly {
             pair := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
+        */
         uint32[8] memory _vars = vars;
-        uint8 isPrivate;
         address WETH = IUniswapV2Router02(uniV2Router).WETH();
         if (token0 == WETH) {
             _vars[uint(Vars.maxDump1)] = 10;    // 10% allowed dump during the time frame
@@ -65,6 +80,8 @@ contract UniswapV2Factory is IUniswapV2Factory {
             _vars[uint(Vars.maxTxDump0)] = 0;    // 0% allowed dump in single transaction
             if (token0 == bswap) isPrivate = 1;
         }
+
+        pair = Clones.cloneDeterministic(pairImplementation, salt);
         IUniswapV2Pair(pair).initialize(token0, token1, _vars, isPrivate);
         getPair[token0][token1] = pair;
         getPair[token1][token0] = pair; // populate mapping in the reverse direction
@@ -93,12 +110,12 @@ contract UniswapV2Factory is IUniswapV2Factory {
     function swapFee(address token0, address token1, uint fee0, uint fee1) external returns(bool) {
         //return false; // TEST
         uint gasA = gasleft();
+        require(isPair[msg.sender], "Only pair");
         address WETH = IUniswapV2Router02(uniV2Router).WETH();
         address _bswap = bswap;
         address _bSwapPair = getPair[_bswap][WETH];
-        address _feeTo = feeTo;
         uint32 _feeToPart = feeToPart;
-        if (_feeTo == address(0) || _bSwapPair == address(0)) return false;
+        if (_bSwapPair == address(0)) return false;
         address _factory = IUniswapV2Router02(uniV2Router).factory();
         uint amount;
         if (fee0 != 0) amount = _swapFee(_factory, WETH, token0, fee0);
@@ -186,10 +203,5 @@ contract UniswapV2Factory is IUniswapV2Factory {
         if (balance != 0) {
             IWETH(WETH).withdraw(balance);
         }
-    }
-
-    function getHash() external view returns (bytes32 bytecodeHash) {
-        bytes memory bytecode = type(UniswapV2Pair).creationCode;
-        bytecodeHash = keccak256(bytecode);
     }
 }

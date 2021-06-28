@@ -1,0 +1,106 @@
+{
+	"compiler": {
+		"version": "0.5.16+commit.9c3226ce"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"constant": false,
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "user",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "feeAmount",
+						"type": "uint256"
+					}
+				],
+				"name": "requestCompensation",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"payable": false,
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"methods": {}
+		},
+		"userdoc": {
+			"methods": {}
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"bSwap-v2-core/contracts/UniswapV2Factory.sol": "ISmart"
+		},
+		"evmVersion": "istanbul",
+		"libraries": {},
+		"optimizer": {
+			"enabled": true,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"bSwap-v2-core/contracts/UniswapV2Factory.sol": {
+			"keccak256": "0x7a189cf78f6379af39adfa70a1426618b60c6077bb7b4c00c08da7482b22b159",
+			"urls": [
+				"bzz-raw://3fa9277b07f26d13fd32a71e7241d7a8eac298db0788fd0d052b6e269b1c1993",
+				"dweb:/ipfs/QmPTaBBP8hWptqABqhExVnqRwPMeJ7sTi6tXJgkTGrku1v"
+			]
+		},
+		"bSwap-v2-core/contracts/interfaces/IERC20.sol": {
+			"keccak256": "0xb373d0f774b81c8dd0655d177f3dc44afa7a57809048b44f602dc6095644501f",
+			"urls": [
+				"bzz-raw://23b41b5a757e591fa960c12f8cead0482830b4f11f1e50090ae3dbe48e91c79b",
+				"dweb:/ipfs/QmZkx1uCdYjhTF9y8KGqN2ApsKk3W67uNnNMh9jZPP2tcY"
+			]
+		},
+		"bSwap-v2-core/contracts/interfaces/IUniswapV2Factory.sol": {
+			"keccak256": "0xa3f38f12bfeac71e9143e79157caaa5f4327de51ae4878ae363a804b32662291",
+			"urls": [
+				"bzz-raw://3d7e87aa86a760b3e2e2f6dbbc06847bd4a6359fe65340957ee7d9bdbaa12f97",
+				"dweb:/ipfs/QmWtmU6efKbK9Rf2tijds8uRn77RDYnFsjpaJbTy4ZCEAm"
+			]
+		},
+		"bSwap-v2-core/contracts/interfaces/IUniswapV2Pair.sol": {
+			"keccak256": "0xe7802f92960475e8ef938adf8ebd85a4bbf578cd2d009849ac454ac5fa471107",
+			"urls": [
+				"bzz-raw://d40a10dd1d4f62a582a0d92f302f4898b4c7754e81626e36a1c788b1dbc49f80",
+				"dweb:/ipfs/QmWqGdSrrkK7wRM53bevQRZTgRS9tz4p2XQzNrM14jUCA1"
+			]
+		},
+		"bSwap-v2-core/contracts/interfaces/IUniswapV2Router02.sol": {
+			"keccak256": "0xef18aec81ecbc254f787aeb6d95c88ed8f489173efd34f0d536d85653d28d1b8",
+			"urls": [
+				"bzz-raw://3035e3efb133c6ae29065cd6ed1d5c93ef9c471a4867a4d9111162b58d9e9b0c",
+				"dweb:/ipfs/QmbaYkyEVvhgNGaYAumvxXS9jTM6kzy2KXdVbMz2g27TYm"
+			]
+		},
+		"bSwap-v2-core/contracts/interfaces/IWETH.sol": {
+			"keccak256": "0xfc10758fd8dba790c39468dccd358cb7cef06ae7c4781832cc7aa76f91f167e6",
+			"urls": [
+				"bzz-raw://dc22493dea6c60d47835eeba53726f8a6f76f4fcd798d40e54608a1380515d49",
+				"dweb:/ipfs/QmS1QVcBRH4TELYNE7XCfjSVQEWFupyaNLKmMkKH7iPjrm"
+			]
+		},
+		"bSwap-v2-core/contracts/libraries/Clones.sol": {
+			"keccak256": "0x6592c26cab4b81617acf6c76bd5081f97c0a5d13990d310adcf94a8cba3e0400",
+			"urls": [
+				"bzz-raw://38b2b0bd25e99066b68c7183cc73386a8034c2d1415b79f2ee97f7e62b3007b9",
+				"dweb:/ipfs/QmdeRUch44kX2Z4ZgdV9bxa9QBD2B3cjwuzaoN6sXNeZEW"
+			]
+		}
+	},
+	"version": 1
+}

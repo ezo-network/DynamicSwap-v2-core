@@ -4,8 +4,8 @@ import './UniswapV2ERC20.sol';
 
 
 contract BSwapVoting is UniswapV2ERC20 {
-    uint256 public votingTime = 1 days;   // duration of voting
-    uint256 public minimalLevel = 10; // user who has this percentage of token can suggest change
+    uint256 public votingTime;   // duration of voting
+    uint256 public minimalLevel; // user who has this percentage of token can suggest change
     
     uint256 public ballotIds;
     uint256 public rulesIds;
@@ -41,12 +41,15 @@ contract BSwapVoting is UniswapV2ERC20 {
         _;        
     }
 
-    constructor() public {
+    function initialize() internal {
         rules[0] = Rule(75,"setVotingDuration(uint256)");
         rules[1] = Rule(75,"setMinimalLevel(uint256)");
         rules[2] = Rule(75,"setVars(uint256,uint32)");
         rules[3] = Rule(75,"switchPool(uint256)");
         rulesIds = 3;
+        votingTime = 1 days;
+        minimalLevel = 10;
+        super.initialize();
     }
     
     /**

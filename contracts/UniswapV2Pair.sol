@@ -8,6 +8,7 @@ import './interfaces/IERC20.sol';
 import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV2Callee.sol';
 
+// This contract is implementation of code for pair.
 contract UniswapV2Pair is IUniswapV2Pair, BSwapVoting {
     using SafeMath  for uint;
     using UQ112x112 for uint224;
@@ -42,7 +43,7 @@ contract UniswapV2Pair is IUniswapV2Pair, BSwapVoting {
     uint public price1CumulativeLast;
     uint public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
 
-    uint private unlocked = 1;
+    uint private unlocked;
     modifier lock() {
         require(unlocked == 1, 'UniswapV2: LOCKED');
         unlocked = 0;
@@ -74,17 +75,22 @@ contract UniswapV2Pair is IUniswapV2Pair, BSwapVoting {
     event Sync(uint112 reserve0, uint112 reserve1);
     event AddReward(uint reward);
 
+    /*
     constructor() public {
         factory = msg.sender;
     }
-    
+    */
+
     // called once by the factory at time of deployment
     function initialize(address _token0, address _token1, uint32[8] calldata _vars, uint8 _isPrivate) external {
-        require(msg.sender == factory, 'UniswapV2: FORBIDDEN'); // sufficient check
+        require(address(0) == factory, 'UniswapV2: FORBIDDEN'); // sufficient check
+        unlocked = 1;
+        factory = msg.sender;
         token0 = _token0;
         token1 = _token1;
         vars = _vars;
         isPrivate = _isPrivate;
+        super.initialize();
     }
 
     function getAmountOut(uint amountIn, address tokenIn, address tokenOut) external view returns(uint amountOut) {

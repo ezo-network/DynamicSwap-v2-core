@@ -146,6 +146,32 @@
 				"type": "function"
 			},
 			{
+				"constant": false,
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "tokenA",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "tokenB",
+						"type": "address"
+					}
+				],
+				"name": "createPrivatePair",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "pair",
+						"type": "address"
+					}
+				],
+				"payable": false,
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"constant": true,
 				"inputs": [],
 				"name": "feeTo",
@@ -437,7 +463,7 @@
 	},
 	"settings": {
 		"compilationTarget": {
-			"bSwap-v2-core/contracts/UniswapV2Factory.sol": "UniswapV2Factory"
+			"bSwap-v2-core/contracts/UniswapV2Factory.sol": "BswapV2Factory"
 		},
 		"evmVersion": "istanbul",
 		"libraries": {},
@@ -449,10 +475,10 @@
 	},
 	"sources": {
 		"bSwap-v2-core/contracts/UniswapV2Factory.sol": {
-			"keccak256": "0x2320c6631c2630c6d4d0348269b9be4fbe0410970740da3efd73d39dc7f1dfb8",
+			"keccak256": "0x7a189cf78f6379af39adfa70a1426618b60c6077bb7b4c00c08da7482b22b159",
 			"urls": [
-				"bzz-raw://132d6cfa642d7b35314f514ee48ac4612b56776e990731b5ffb341f8eb5f35eb",
-				"dweb:/ipfs/Qme4tn7Kx5KwRBJhhJdAz3SX4iZ7P1qzja8TV5NZx1yPMT"
+				"bzz-raw://3fa9277b07f26d13fd32a71e7241d7a8eac298db0788fd0d052b6e269b1c1993",
+				"dweb:/ipfs/QmPTaBBP8hWptqABqhExVnqRwPMeJ7sTi6tXJgkTGrku1v"
 			]
 		},
 		"bSwap-v2-core/contracts/interfaces/IERC20.sol": {
@@ -470,10 +496,10 @@
 			]
 		},
 		"bSwap-v2-core/contracts/interfaces/IUniswapV2Pair.sol": {
-			"keccak256": "0x24d659f1ba79f47e28badfae7b3cd1ea0da9a40f5709e798e64f05075998d406",
+			"keccak256": "0xe7802f92960475e8ef938adf8ebd85a4bbf578cd2d009849ac454ac5fa471107",
 			"urls": [
-				"bzz-raw://917c9f5058dea2d3d25a561760ea33c11409c09b8eb074c3aa3caa669b658960",
-				"dweb:/ipfs/QmNroB9bCoexW1SqL7xpfB2goYXko4h2ZRXhbFuK553Pgd"
+				"bzz-raw://d40a10dd1d4f62a582a0d92f302f4898b4c7754e81626e36a1c788b1dbc49f80",
+				"dweb:/ipfs/QmWqGdSrrkK7wRM53bevQRZTgRS9tz4p2XQzNrM14jUCA1"
 			]
 		},
 		"bSwap-v2-core/contracts/interfaces/IUniswapV2Router02.sol": {

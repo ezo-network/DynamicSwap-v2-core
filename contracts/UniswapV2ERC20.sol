@@ -28,7 +28,7 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
     event Approval(address indexed owner, address indexed spender, uint value);
     event Transfer(address indexed from, address indexed to, uint value);
 
-    constructor() public {
+    function initialize() internal {
         uint chainId;
         assembly {
             chainId := chainid
@@ -42,6 +42,7 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
                 address(this)
             )
         );
+        //super.initialize();
     }
 
     function _updateTotalWeight() internal {
