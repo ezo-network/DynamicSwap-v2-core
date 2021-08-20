@@ -257,6 +257,9 @@ contract UniswapV2Pair is IUniswapV2Pair, BSwapVoting {
         //bool feeOn = _mintFee(_reserve0, _reserve1);
         uint _totalSupply = totalSupply; // gas savings, must be defined here since totalSupply can update in _mintFee
         if (_totalSupply == 0) {
+            uint priceBefore0 = uint(UQ112x112.encode(balance1).uqdiv(balance0));
+            lastMA = uint128(priceBefore0);
+            baseLinePrice0 = uint128(priceBefore0);
             liquidity = Math.sqrt(amount0.mul(amount1)).sub(MINIMUM_LIQUIDITY);
            _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
@@ -373,6 +376,6 @@ contract UniswapV2Pair is IUniswapV2Pair, BSwapVoting {
     function switchPool(uint toPublic) external onlyVoting {
         require(isPrivate != 0, "Pool can't be switched");
         if(toPublic == 1 && isPrivate == 1) isPrivate = 2;  // switch pool to public mode (anybody can add liquidity)
-        if(toPublic == 0 && isPrivate == 2) isPrivate = 1;  // switch pool to public mode (anybody can add liquidity)
+        if(toPublic == 0 && isPrivate == 2) isPrivate = 1;  // switch pool to private mode (nobody, except LP holders, can add liquidity)
     }
 }

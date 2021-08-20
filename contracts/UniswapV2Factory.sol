@@ -202,6 +202,10 @@ contract BswapV2Factory is IUniswapV2Factory {
         uint balance = IERC20(WETH).balanceOf(address(this));
         if (balance != 0) {
             IWETH(WETH).withdraw(balance);
+            msg.sender.transfer(address(this).balance);
+            //_safeTransfer(WETH, msg.sender, balance);
         }
     }
+
+    function () external payable {}
 }
