@@ -257,7 +257,7 @@ contract BSwapV2Pair is IBSwapV2Pair, BSwapVoting {
         //bool feeOn = _mintFee(_reserve0, _reserve1);
         uint _totalSupply = totalSupply; // gas savings, must be defined here since totalSupply can update in _mintFee
         if (_totalSupply == 0) {
-            uint priceBefore0 = uint(UQ112x112.encode(balance1).uqdiv(balance0));
+            uint priceBefore0 = uint(UQ112x112.encode(uint112(balance1)).uqdiv(uint112(balance0)));
             lastMA = uint128(priceBefore0);
             baseLinePrice0 = uint128(priceBefore0);
             liquidity = Math.sqrt(amount0.mul(amount1)).sub(MINIMUM_LIQUIDITY);
