@@ -1,6 +1,6 @@
 pragma solidity >=0.5.0;
 
-interface IUniswapV2Factory {
+interface IBSwapV2Factory {
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
 
     function uniV2Router() external view returns (address);

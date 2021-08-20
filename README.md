@@ -1,11 +1,11 @@
-# Uniswap V2
+# BSwap V2
 
-[![Actions Status](https://github.com/Uniswap/uniswap-v2-core/workflows/CI/badge.svg)](https://github.com/Uniswap/uniswap-v2-core/actions)
-[![Version](https://img.shields.io/npm/v/@uniswap/v2-core)](https://www.npmjs.com/package/@uniswap/v2-core)
+[![Actions Status](https://github.com/BSwap/bswap-v2-core/workflows/CI/badge.svg)](https://github.com/BSwap/bswap-v2-core/actions)
+[![Version](https://img.shields.io/npm/v/@bswap/v2-core)](https://www.npmjs.com/package/@bswap/v2-core)
 
-In-depth documentation on Uniswap V2 is available at [uniswap.org](https://uniswap.org/docs).
+In-depth documentation on BSwap V2 is available at [bswap.org](https://bswap.org/docs).
 
-The built contract artifacts can be browsed via [unpkg.com](https://unpkg.com/browse/@uniswap/v2-core@latest/).
+The built contract artifacts can be browsed via [unpkg.com](https://unpkg.com/browse/@bswap/v2-core@latest/).
 
 # Local Development
 

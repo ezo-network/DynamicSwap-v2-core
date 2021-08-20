@@ -1,18 +1,18 @@
 pragma solidity =0.5.16;
 
-import './interfaces/IUniswapV2Router02.sol';
-import './interfaces/IUniswapV2Factory.sol';
+import './interfaces/IBSwapV2Router02.sol';
+import './interfaces/IBSwapV2Factory.sol';
 import './interfaces/IERC20.sol';
 import './interfaces/IWETH.sol';
 import './libraries/Clones.sol';
-import './interfaces/IUniswapV2Pair.sol';
-//import './UniswapV2Pair.sol';
+import './interfaces/IBSwapV2Pair.sol';
+//import './BSwapV2Pair.sol';
 
 interface ISmart {
     function requestCompensation(address user, uint256 feeAmount) external returns(bool);
 }
 
-contract BswapV2Factory is IUniswapV2Factory {
+contract BswapV2Factory is IBSwapV2Factory {
     enum Vars {timeFrame, maxDump0, maxDump1, maxTxDump0, maxTxDump1, coefficient, minimalFee, periodMA}
     uint32[8] public vars; // timeFrame, maxDump0, maxDump1, maxTxDump0, maxTxDump1, coefficient, minimalFee, periodMA
     //timeFrame = 1 days;  // during this time frame rate of reserve1/reserve0 should be in range [baseLinePrice0*(1-maxDump0), baseLinePrice0*(1+maxDump1)]
@@ -53,24 +53,24 @@ contract BswapV2Factory is IUniswapV2Factory {
     }
     
     function createPrivatePair(address tokenA, address tokenB) external returns (address pair) {
-        require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
         return _createPair(tokenA, tokenB, uint8(1));
     }
 
     function _createPair(address tokenA, address tokenB, uint8 isPrivate) internal returns (address pair) {
-        require(tokenA != tokenB, 'UniswapV2: IDENTICAL_ADDRESSES');
+        require(tokenA != tokenB, 'BSwapV2: IDENTICAL_ADDRESSES');
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        require(token0 != address(0), 'UniswapV2: ZERO_ADDRESS');
-        require(getPair[token0][token1] == address(0), 'UniswapV2: PAIR_EXISTS'); // single check is sufficient
+        require(token0 != address(0), 'BSwapV2: ZERO_ADDRESS');
+        require(getPair[token0][token1] == address(0), 'BSwapV2: PAIR_EXISTS'); // single check is sufficient
         bytes32 salt = keccak256(abi.encodePacked(token0, token1));
         /*
-        bytes memory bytecode = type(UniswapV2Pair).creationCode;
+        bytes memory bytecode = type(BSwapV2Pair).creationCode;
         assembly {
             pair := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
         */
         uint32[8] memory _vars = vars;
-        address WETH = IUniswapV2Router02(uniV2Router).WETH();
+        address WETH = IBSwapV2Router02(uniV2Router).WETH();
         if (token0 == WETH) {
             _vars[uint(Vars.maxDump1)] = 10;    // 10% allowed dump during the time frame
             _vars[uint(Vars.maxTxDump1)] = 0;    // 0% allowed dump in single transaction
@@ -82,7 +82,7 @@ contract BswapV2Factory is IUniswapV2Factory {
         }
 
         pair = Clones.cloneDeterministic(pairImplementation, salt);
-        IUniswapV2Pair(pair).initialize(token0, token1, _vars, isPrivate);
+        IBSwapV2Pair(pair).initialize(token0, token1, _vars, isPrivate);
         getPair[token0][token1] = pair;
         getPair[token1][token0] = pair; // populate mapping in the reverse direction
         allPairs.push(pair);
@@ -91,12 +91,12 @@ contract BswapV2Factory is IUniswapV2Factory {
     }
 
     function setFeeTo(address _feeTo) external {
-        require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
         feeTo = _feeTo;
     }
 
     function setFeeToSetter(address _feeToSetter) external {
-        require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
         feeToSetter = _feeToSetter;
     }
 
@@ -111,27 +111,27 @@ contract BswapV2Factory is IUniswapV2Factory {
         //return false; // TEST
         uint gasA = gasleft();
         require(isPair[msg.sender], "Only pair");
-        address WETH = IUniswapV2Router02(uniV2Router).WETH();
+        address WETH = IBSwapV2Router02(uniV2Router).WETH();
         address _bswap = bswap;
         address _bSwapPair = getPair[_bswap][WETH];
         uint32 _feeToPart = feeToPart;
         if (_bSwapPair == address(0)) return false;
-        address _factory = IUniswapV2Router02(uniV2Router).factory();
+        address _factory = IBSwapV2Router02(uniV2Router).factory();
         uint amount;
         if (fee0 != 0) amount = _swapFee(_factory, WETH, token0, fee0);
         if (fee1 != 0) amount += _swapFee(_factory, WETH, token1, fee1);
         if (amount == 0) return false;
-        (uint112 _reserve0, uint112 _reserve1,) = IUniswapV2Pair(_bSwapPair).getReserves();
+        (uint112 _reserve0, uint112 _reserve1,) = IBSwapV2Pair(_bSwapPair).getReserves();
         if (WETH > _bswap) {
             (_reserve0, _reserve1) = (_reserve1, _reserve0);
         }
         uint fee = amount;
         amount = (100 - _feeToPart) * amount / 100; // amount in WETH
         _safeTransfer(WETH, _bSwapPair, amount);
-        IUniswapV2Pair(_bSwapPair).sync();
+        IBSwapV2Pair(_bSwapPair).sync();
         amount = amount / 2; // amount in WETH
         amount = (amount * _reserve1) / (_reserve0 + amount);
-        IUniswapV2Pair(msg.sender).addReward(amount); // amount in bswap
+        IBSwapV2Pair(msg.sender).addReward(amount); // amount in bswap
         if (compensator != address(0)) {
             fee = fee + ((10000 + gasA - gasleft()) * tx.gasprice); // add gas for swap
             ISmart(compensator).requestCompensation(tx.origin, fee);       // user reimbursement
@@ -140,16 +140,16 @@ contract BswapV2Factory is IUniswapV2Factory {
     }
 
     function _swapFee(address _factory, address WETH, address _token, uint _feeAmount) internal returns(uint amountOut) {
-        address _pair = IUniswapV2Factory(_factory).getPair(_token, WETH);
+        address _pair = IBSwapV2Factory(_factory).getPair(_token, WETH);
         if (_pair == address(0)) return 0;  // no pair token-WETH
-        (uint112 _reserve0, uint112 _reserve1,) = IUniswapV2Pair(_pair).getReserves();
+        (uint112 _reserve0, uint112 _reserve1,) = IBSwapV2Pair(_pair).getReserves();
         _safeTransferFrom(_token, msg.sender, _pair, _feeAmount);
         if (_token < WETH) {
-            amountOut = IUniswapV2Router02(uniV2Router).getAmountOut(_feeAmount, _reserve0, _reserve1);
-            IUniswapV2Pair(_pair).swap(0, amountOut, address(this), new bytes(0));
+            amountOut = IBSwapV2Router02(uniV2Router).getAmountOut(_feeAmount, _reserve0, _reserve1);
+            IBSwapV2Pair(_pair).swap(0, amountOut, address(this), new bytes(0));
         } else {
-            amountOut = IUniswapV2Router02(uniV2Router).getAmountOut(_feeAmount, _reserve1, _reserve0);
-            IUniswapV2Pair(_pair).swap(amountOut, 0, address(this), new bytes(0));
+            amountOut = IBSwapV2Router02(uniV2Router).getAmountOut(_feeAmount, _reserve1, _reserve0);
+            IBSwapV2Pair(_pair).swap(amountOut, 0, address(this), new bytes(0));
         }
     }
 
@@ -166,7 +166,7 @@ contract BswapV2Factory is IUniswapV2Factory {
     }
 
     function setVars(uint varId, uint32 value) external {
-        require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
         require(varId <= vars.length, "Wrong varID");
         if (varId == uint(Vars.timeFrame) || varId == uint(Vars.periodMA))
             require(value != 0, "Wrong time frame");
@@ -178,27 +178,27 @@ contract BswapV2Factory is IUniswapV2Factory {
 
     // set Router contract address
     function setRouter(address _router) external {
-        require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
         require(_router != address(0), "Address zero");
         uniV2Router = _router;
     }
 
     // set bSwap token address
     function setBSwap(address _bswap) external {
-        require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
         require(_bswap != address(0), "Address zero");
         bswap = _bswap;
     }
 
     // set compensator contract address for users reimbursements, address(0) to switch of reimbursement
     function setCompensator(address _compensator) external {
-        require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
         compensator = _compensator;
     }
 
     function withdrawFees() external {
-        require(msg.sender == feeTo, 'UniswapV2: FORBIDDEN');
-        address WETH = IUniswapV2Router02(uniV2Router).WETH();
+        require(msg.sender == feeTo, 'BSwapV2: FORBIDDEN');
+        address WETH = IBSwapV2Router02(uniV2Router).WETH();
         uint balance = IERC20(WETH).balanceOf(address(this));
         if (balance != 0) {
             IWETH(WETH).withdraw(balance);
