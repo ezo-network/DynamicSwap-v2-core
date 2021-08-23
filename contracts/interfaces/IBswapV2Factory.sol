@@ -20,6 +20,6 @@ interface IBSwapV2Factory {
     function swapFee(address token0, address token1, uint fee0, uint fee1) external returns(bool);
     function setVars(uint varId, uint32 value) external;
     function setRouter(address _router) external;
-    function setCompensator(address _compensator) external;
+    function setReimbursementContractAndVault(address _reimbursement, address _vault) external;
     function withdrawFees() external;
 }

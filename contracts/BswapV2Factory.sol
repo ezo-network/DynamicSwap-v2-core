@@ -8,8 +8,11 @@ import './libraries/Clones.sol';
 import './interfaces/IBSwapV2Pair.sol';
 //import './BSwapV2Pair.sol';
 
-interface ISmart {
-    function requestCompensation(address user, uint256 feeAmount) external returns(bool);
+interface IReimbursement {
+    // returns fee percentage with 2 decimals
+    function getLicenseeFee(address vault, address projectContract) external view returns(uint256);
+    // returns fee receiver address or address(0) if need to refund fee to user.
+    function requestReimbursement(address user, uint256 feeAmount, address vault) external returns(address);
 }
 
 contract BswapV2Factory is IBSwapV2Factory {
@@ -25,7 +28,8 @@ contract BswapV2Factory is IBSwapV2Factory {
     //periodMA = 45 minutes;  // MA period in seconds
     address public bswap;   // bSwap token address
     address public uniV2Router; // uniswap compatible router
-    address public compensator; // address of users reimbursements contract
+    address public reimbursement; // address of users reimbursements contract
+    address public reimbursementVault;  // address of company vault for reimbursements
     address public pairImplementation;  // pair implementation code contract (using in clone).
     address public feeTo;
     uint32 public feeToPart = 20; // company part of charged fee (in percentage). I.e. send to `feeTo` amount of (charged fee * feeToPart / 100)
@@ -132,9 +136,9 @@ contract BswapV2Factory is IBSwapV2Factory {
         amount = amount / 2; // amount in WETH
         amount = (amount * _reserve1) / (_reserve0 + amount);
         IBSwapV2Pair(msg.sender).addReward(amount); // amount in bswap
-        if (compensator != address(0)) {
+        if (reimbursement != address(0)) {
             fee = fee + ((10000 + gasA - gasleft()) * tx.gasprice); // add gas for swap
-            ISmart(compensator).requestCompensation(tx.origin, fee);       // user reimbursement
+            IReimbursement(reimbursement).requestReimbursement(tx.origin, fee, reimbursementVault);      // user reimbursement
         }
         return true;
     }
@@ -190,10 +194,11 @@ contract BswapV2Factory is IBSwapV2Factory {
         bswap = _bswap;
     }
 
-    // set compensator contract address for users reimbursements, address(0) to switch of reimbursement
-    function setCompensator(address _compensator) external {
+    // set reimbursement contract address for users reimbursements, address(0) to switch of reimbursement
+    function setReimbursementContractAndVault(address _reimbursement, address _vault) external {
         require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
-        compensator = _compensator;
+        reimbursement = _reimbursement;
+        reimbursementVault = _vault;
     }
 
     function withdrawFees() external {
