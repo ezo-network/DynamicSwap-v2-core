@@ -24,8 +24,8 @@ contract BSwapV2Pair is IBSwapV2Pair, BSwapVoting {
     //minimalFee = 1;   // Minimal fee percentage (with 1 decimals) applied to transaction. I.e. 1 = 0.1%
     //periodMA = 45*60;  // MA period in seconds
 
-    uint128 public baseLinePrice0;// base line of reserve1/reserve0 rate fixed on beginning od each time frame.
-    uint128 public lastMA;        // last MA value
+    uint256 public baseLinePrice0;// base line of reserve1/reserve0 rate fixed on beginning od each time frame.
+    uint256 public lastMA;        // last MA value
 
     uint public constant MINIMUM_LIQUIDITY = 10**3;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes('transfer(address,uint256)')));
@@ -180,7 +180,7 @@ contract BSwapV2Pair is IBSwapV2Pair, BSwapVoting {
         uint _baseLinePrice0 = baseLinePrice0;
         if (blockTimestamp/_vars[uint(Vars.timeFrame)] != blockTimestampLast/_vars[uint(Vars.timeFrame)]) {   //new time frame 
             _baseLinePrice0 = uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0));
-            baseLinePrice0 = uint128(_baseLinePrice0);
+            baseLinePrice0 = _baseLinePrice0;
         }
         if (_baseLinePrice0 !=0)
             require(priceAfter0 * 100 / _baseLinePrice0 >= (uint(100).sub(_vars[uint(Vars.maxDump0)])) &&
@@ -194,7 +194,7 @@ contract BSwapV2Pair is IBSwapV2Pair, BSwapVoting {
         uint ma;
         if (timeElapsed >= _vars[uint(Vars.periodMA)]) ma = priceBefore0;
         else ma = ((_vars[uint(Vars.periodMA)] - timeElapsed)*lastMA + priceBefore0*timeElapsed) / _vars[uint(Vars.periodMA)];
-        lastMA = uint128(ma);
+        lastMA = ma;
         fee0 = priceAfter0 * 1000 / ma;
         if (fee0 <= 1000) {
             fee0 = (1000 - fee0) * _vars[uint(Vars.coefficient)] / 100;
@@ -258,8 +258,8 @@ contract BSwapV2Pair is IBSwapV2Pair, BSwapVoting {
         uint _totalSupply = totalSupply; // gas savings, must be defined here since totalSupply can update in _mintFee
         if (_totalSupply == 0) {
             uint priceBefore0 = uint(UQ112x112.encode(uint112(balance1)).uqdiv(uint112(balance0)));
-            lastMA = uint128(priceBefore0);
-            baseLinePrice0 = uint128(priceBefore0);
+            lastMA = priceBefore0;
+            baseLinePrice0 = priceBefore0;
             liquidity = Math.sqrt(amount0.mul(amount1)).sub(MINIMUM_LIQUIDITY);
            _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
@@ -324,12 +324,12 @@ contract BSwapV2Pair is IBSwapV2Pair, BSwapVoting {
         { // scope for reserve{0,1}Adjusted, avoids stack too deep errors
         uint fee0;
         uint fee1;
+        address _token0 = token0;
+        address _token1 = token1;
         if (to != factory) {    // avoid endless loop of fee swapping
             (fee0, fee1) = _getFeeAndDumpProtection(balance0, balance1, _reserve0, _reserve1);
             fee0 = amount0In.mul(fee0) / 1000;
             fee1 = amount1In.mul(fee1) / 1000;
-            address _token0 = token0;
-            address _token1 = token1;
             if (fee0 > 0) IERC20(_token0).approve(factory, fee0);
             if (fee1 > 0) IERC20(_token1).approve(factory, fee1);
             IBSwapV2Factory(factory).swapFee(_token0, _token1, fee0, fee1);
@@ -337,9 +337,9 @@ contract BSwapV2Pair is IBSwapV2Pair, BSwapVoting {
         //uint balance0Adjusted = balance0.mul(1000).sub(amount0In.mul(3));
         //uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
         require((balance0.sub(fee0)).mul(balance1.sub(fee1)) >= uint(_reserve0).mul(_reserve1), 'BSwapV2: K');
+        _update(IERC20(_token0).balanceOf(address(this)), IERC20(_token1).balanceOf(address(this)), _reserve0, _reserve1);
         }
-
-        _update(balance0, balance1, _reserve0, _reserve1);
+        //_update(balance0, balance1, _reserve0, _reserve1);
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 

@@ -127,12 +127,12 @@ contract BswapV2Factory is IBSwapV2Factory {
         if (amount == 0) return false;
         (uint112 _reserve0, uint112 _reserve1,) = IBSwapV2Pair(_bSwapPair).getReserves();
         if (WETH > _bswap) {
-            (_reserve0, _reserve1) = (_reserve1, _reserve0);
+            (_reserve0, _reserve1) = (_reserve1, _reserve0);    // WETH amount = _reserve0
         }
         uint fee = amount;
         amount = (100 - _feeToPart) * amount / 100; // amount in WETH
         _safeTransfer(WETH, _bSwapPair, amount);
-        IBSwapV2Pair(_bSwapPair).sync();
+        //IBSwapV2Pair(_bSwapPair).sync();    // sync in pair
         amount = amount / 2; // amount in WETH
         amount = (amount * _reserve1) / (_reserve0 + amount);
         IBSwapV2Pair(msg.sender).addReward(amount); // amount in bswap
@@ -144,15 +144,28 @@ contract BswapV2Factory is IBSwapV2Factory {
     }
 
     function _swapFee(address _factory, address WETH, address _token, uint _feeAmount) internal returns(uint amountOut) {
+        if (_token == WETH) {
+            _safeTransferFrom(_token, msg.sender, address(this), _feeAmount);
+            return _feeAmount;
+        }
         address _pair = IBSwapV2Factory(_factory).getPair(_token, WETH);
         if (_pair == address(0)) return 0;  // no pair token-WETH
         (uint112 _reserve0, uint112 _reserve1,) = IBSwapV2Pair(_pair).getReserves();
         _safeTransferFrom(_token, msg.sender, _pair, _feeAmount);
+        uint amountInput = IERC20(_token).balanceOf(address(_pair));
         if (_token < WETH) {
-            amountOut = IBSwapV2Router02(uniV2Router).getAmountOut(_feeAmount, _reserve0, _reserve1);
+            if (amountInput < _reserve0)
+                return 0;
+            else
+                amountInput -=_reserve0;
+            amountOut = IBSwapV2Router02(uniV2Router).getAmountOut(amountInput, _reserve0, _reserve1);
             IBSwapV2Pair(_pair).swap(0, amountOut, address(this), new bytes(0));
         } else {
-            amountOut = IBSwapV2Router02(uniV2Router).getAmountOut(_feeAmount, _reserve1, _reserve0);
+            if (amountInput < _reserve1)
+                return 0;
+            else
+                amountInput -= _reserve1;
+            amountOut = IBSwapV2Router02(uniV2Router).getAmountOut(amountInput, _reserve1, _reserve0);
             IBSwapV2Pair(_pair).swap(amountOut, 0, address(this), new bytes(0));
         }
     }
