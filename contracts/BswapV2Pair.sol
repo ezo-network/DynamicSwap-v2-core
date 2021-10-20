@@ -337,9 +337,9 @@ contract BSwapV2Pair is IBSwapV2Pair, BSwapVoting {
         //uint balance0Adjusted = balance0.mul(1000).sub(amount0In.mul(3));
         //uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
         require((balance0.sub(fee0)).mul(balance1.sub(fee1)) >= uint(_reserve0).mul(_reserve1), 'BSwapV2: K');
-        _update(IERC20(_token0).balanceOf(address(this)), IERC20(_token1).balanceOf(address(this)), _reserve0, _reserve1);
+        //_update(IERC20(_token0).balanceOf(address(this)), IERC20(_token1).balanceOf(address(this)), _reserve0, _reserve1);
         }
-        //_update(balance0, balance1, _reserve0, _reserve1);
+        _update(balance0, balance1, _reserve0, _reserve1);
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 

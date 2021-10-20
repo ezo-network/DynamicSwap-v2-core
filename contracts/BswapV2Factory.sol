@@ -32,8 +32,9 @@ contract BswapV2Factory is IBSwapV2Factory {
     address public reimbursementVault;  // address of company vault for reimbursements
     address public pairImplementation;  // pair implementation code contract (using in clone).
     address public feeTo;
-    uint32 public feeToPart = 20; // company part of charged fee (in percentage). I.e. send to `feeTo` amount of (charged fee * feeToPart / 100)
+    uint256 public feeToPart = 20; // company part of charged fee (in percentage). I.e. send to `feeTo` amount of (charged fee * feeToPart / 100)
     address public feeToSetter;
+    bool public defaultCircuitBreakerEnable = true; // protect from dumping token against WETH
 
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
@@ -53,15 +54,28 @@ contract BswapV2Factory is IBSwapV2Factory {
     }
 
     function createPair(address tokenA, address tokenB) external returns (address pair) {
-        return _createPair(tokenA, tokenB, uint8(0));
-    }
-    
-    function createPrivatePair(address tokenA, address tokenB) external returns (address pair) {
-        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
-        return _createPair(tokenA, tokenB, uint8(1));
+        uint8 circuitBreaker;
+        if (defaultCircuitBreakerEnable) circuitBreaker = 3;
+        return _createPair(tokenA, tokenB, circuitBreaker);
     }
 
-    function _createPair(address tokenA, address tokenB, uint8 isPrivate) internal returns (address pair) {
+    // circuitBreaker:
+    // 0 - disable
+    // 1 - protect from dumping token A
+    // 2 - protect from dumping token B
+    // 3 - protect from dumping token against WETH
+    function createPair(address tokenA, address tokenB, uint8 circuitBreaker) external returns (address pair) {
+        require(circuitBreaker < 4, "Wrong circuitBreaker");
+        return _createPair(tokenA, tokenB, circuitBreaker+4);
+    }
+    
+    function createPrivatePair(address tokenA, address tokenB, uint8 circuitBreaker) external returns (address pair) {
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
+        require(circuitBreaker < 4, "Wrong circuitBreaker");
+        return _createPair(tokenA, tokenB, circuitBreaker+4);
+    }
+
+    function _createPair(address tokenA, address tokenB, uint8 circuitBreaker) internal returns (address pair) {
         require(tokenA != tokenB, 'BSwapV2: IDENTICAL_ADDRESSES');
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), 'BSwapV2: ZERO_ADDRESS');
@@ -75,14 +89,14 @@ contract BswapV2Factory is IBSwapV2Factory {
         */
         uint32[8] memory _vars = vars;
         address WETH = IBSwapV2Router02(uniV2Router).WETH();
-        if (token0 == WETH) {
+        uint8 isPrivate;
+        if (circuitBreaker > 3) isPrivate = 1;
+        if ((circuitBreaker == 3 && token0 == WETH) || circuitBreaker == 2) {
             _vars[uint(Vars.maxDump1)] = 10;    // 10% allowed dump during the time frame
             _vars[uint(Vars.maxTxDump1)] = 0;    // 0% allowed dump in single transaction
-            if (token1 == bswap) isPrivate = 1;
-        } else if (token1 == WETH) {
+        } else if ((circuitBreaker == 3 && token1 == WETH) || circuitBreaker == 1) {
             _vars[uint(Vars.maxDump0)] = 10;    // 10% allowed dump during the time frame
             _vars[uint(Vars.maxTxDump0)] = 0;    // 0% allowed dump in single transaction
-            if (token0 == bswap) isPrivate = 1;
         }
 
         pair = Clones.cloneDeterministic(pairImplementation, salt);
@@ -118,26 +132,31 @@ contract BswapV2Factory is IBSwapV2Factory {
         address WETH = IBSwapV2Router02(uniV2Router).WETH();
         address _bswap = bswap;
         address _bSwapPair = getPair[_bswap][WETH];
-        uint32 _feeToPart = feeToPart;
         if (_bSwapPair == address(0)) return false;
         address _factory = IBSwapV2Router02(uniV2Router).factory();
         uint amount;
+        uint fee;
         if (fee0 != 0) amount = _swapFee(_factory, WETH, token0, fee0);
         if (fee1 != 0) amount += _swapFee(_factory, WETH, token1, fee1);
-        if (amount == 0) return false;
+        if (amount == 0) {
+            if (reimbursement != address(0)) {
+                fee = ((73000 + gasA - gasleft()) * tx.gasprice); // add gas for swap
+                IReimbursement(reimbursement).requestReimbursement(tx.origin, fee, reimbursementVault);      // user reimbursement
+            }
+            return false;
+        }
         (uint112 _reserve0, uint112 _reserve1,) = IBSwapV2Pair(_bSwapPair).getReserves();
         if (WETH > _bswap) {
             (_reserve0, _reserve1) = (_reserve1, _reserve0);    // WETH amount = _reserve0
         }
-        uint fee = amount;
-        amount = (100 - _feeToPart) * amount / 100; // amount in WETH
-        _safeTransfer(WETH, _bSwapPair, amount);
+        fee = amount;
+        amount = (100 - feeToPart) * amount / 100; // amount in WETH to move to pool
+        //_safeTransfer(WETH, _bSwapPair, amount);    // add fee to bswap pool on one side
         //IBSwapV2Pair(_bSwapPair).sync();    // sync in pair
-        amount = amount / 2; // amount in WETH
         amount = (amount * _reserve1) / (_reserve0 + amount);
         IBSwapV2Pair(msg.sender).addReward(amount); // amount in bswap
         if (reimbursement != address(0)) {
-            fee = fee + ((10000 + gasA - gasleft()) * tx.gasprice); // add gas for swap
+            fee = fee + ((73000 + gasA - gasleft()) * tx.gasprice); // add gas for swap
             IReimbursement(reimbursement).requestReimbursement(tx.origin, fee, reimbursementVault);      // user reimbursement
         }
         return true;
@@ -189,8 +208,13 @@ contract BswapV2Factory is IBSwapV2Factory {
             require(value != 0, "Wrong time frame");
         else
             require(value <= 100, "Wrong percentage");
-        if (varId == vars.length) feeToPart = value;    // varId = 8
-        else vars[varId] = value;
+        if (varId < vars.length) {
+            vars[varId] = value;
+            return;
+        }
+        if (varId == vars.length) {
+            feeToPart = value;    // varId = 8
+        }
     }
 
     // set Router contract address
@@ -212,6 +236,11 @@ contract BswapV2Factory is IBSwapV2Factory {
         require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
         reimbursement = _reimbursement;
         reimbursementVault = _vault;
+    }
+
+    function setDefaultCircuitBreaker(bool enable) external {
+        require(msg.sender == feeToSetter, 'BSwapV2: FORBIDDEN');
+        defaultCircuitBreakerEnable = enable;
     }
 
     function withdrawFees() external {
