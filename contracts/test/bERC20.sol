@@ -1,8 +1,8 @@
 pragma solidity =0.5.16;
 
-import '../BSwapV2ERC20.sol';
+import '../DynamicERC20.sol';
 
-contract bERC20 is BSwapV2ERC20 {
+contract bERC20 is DynamicERC20 {
     constructor(uint _totalSupply) public {
         _mint(msg.sender, _totalSupply);
     }

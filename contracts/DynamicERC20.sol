@@ -1,9 +1,9 @@
 pragma solidity =0.5.16;
 
-import './interfaces/IBSwapV2ERC20.sol';
+import './interfaces/IDynamicERC20.sol';
 import './libraries/SafeMath.sol';
 
-contract BSwapV2ERC20 is IBSwapV2ERC20 {
+contract DynamicERC20 is IDynamicERC20 {
     using SafeMath for uint;
 
     //address public factory;
@@ -13,8 +13,8 @@ contract BSwapV2ERC20 is IBSwapV2ERC20 {
     mapping(address => uint) public stakingStart;
     mapping(address => uint) public stakingWeight;
 
-    string public constant name = 'bSwap V2';
-    string public constant symbol = 'bSwap-V2';
+    string public constant name = 'dynamic V2';
+    string public constant symbol = 'dynamic-V2';
     uint8 public constant decimals = 18;
     uint  public totalSupply;
     mapping(address => uint) public balanceOf;
@@ -144,7 +144,7 @@ contract BSwapV2ERC20 is IBSwapV2ERC20 {
     }
 
     function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external {
-        require(deadline >= block.timestamp, 'BSwapV2: EXPIRED');
+        require(deadline >= block.timestamp, 'Dynamic: EXPIRED');
         bytes32 digest = keccak256(
             abi.encodePacked(
                 '\x19\x01',
@@ -153,7 +153,7 @@ contract BSwapV2ERC20 is IBSwapV2ERC20 {
             )
         );
         address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, 'BSwapV2: INVALID_SIGNATURE');
+        require(recoveredAddress != address(0) && recoveredAddress == owner, 'Dynamic: INVALID_SIGNATURE');
         _approve(owner, spender, value);
     }
 }

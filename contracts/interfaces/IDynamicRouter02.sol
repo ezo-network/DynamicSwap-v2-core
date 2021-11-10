@@ -1,6 +1,6 @@
 pragma solidity >=0.5.0;
 
-interface IBSwapV2Router02 {
+interface IDynamicRouter02 {
     function removeLiquidityETHSupportingFeeOnTransferTokens(
         address token,
         uint liquidity,
@@ -40,7 +40,7 @@ interface IBSwapV2Router02 {
         uint deadline
     ) external;
 
-// interface IBSwapV2Router01
+// interface IDynamicRouter01
     function factory() external pure returns (address);
     function WETH() external pure returns (address);
 

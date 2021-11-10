@@ -19,7 +19,7 @@ const Rules = [
     {ABI: "setDumpProtectionVars(uint256,uint256)", types: ["uint256","uint256"]}
 ]
 
-describe('BSwapVoting', () => {
+describe('DynamicVoting', () => {
   const provider = new MockProvider({
     hardfork: 'istanbul',
     mnemonic: 'horn horn horn horn horn horn horn horn horn horn horn horn',

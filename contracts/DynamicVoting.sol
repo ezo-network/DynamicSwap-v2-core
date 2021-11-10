@@ -1,9 +1,9 @@
 pragma solidity =0.5.16;
 
-import './BSwapV2ERC20.sol';
+import './DynamicERC20.sol';
 
 
-contract BSwapVoting is BSwapV2ERC20 {
+contract DynamicVoting is DynamicERC20 {
     uint256 public votingTime;   // duration of voting
     uint256 public minimalLevel; // user who has this percentage of token can suggest change
     

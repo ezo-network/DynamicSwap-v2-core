@@ -15,7 +15,7 @@ const overrides = {
   gasLimit: 9999999
 }
 
-describe('BSwapV2Pair', () => {
+describe('DynamicPair', () => {
   const provider = new MockProvider({
     hardfork: 'istanbul',
     mnemonic: 'horn horn horn horn horn horn horn horn horn horn horn horn',
@@ -92,7 +92,7 @@ describe('BSwapV2Pair', () => {
       await addLiquidity(token0Amount, token1Amount)
       await token0.transfer(pair.address, swapAmount)
       await expect(pair.swap(0, expectedOutputAmount.add(1), wallet.address, '0x', overrides)).to.be.revertedWith(
-        'BSwapV2: K'
+        'Dynamic: K'
       )
       await pair.swap(0, expectedOutputAmount, wallet.address, '0x', overrides)
     })
@@ -110,7 +110,7 @@ describe('BSwapV2Pair', () => {
       await addLiquidity(token0Amount, token1Amount)
       await token0.transfer(pair.address, inputAmount)
       await expect(pair.swap(outputAmount.add(1), 0, wallet.address, '0x', overrides)).to.be.revertedWith(
-        'BSwapV2: K'
+        'Dynamic: K'
       )
       await pair.swap(outputAmount, 0, wallet.address, '0x', overrides)
     })
@@ -182,7 +182,7 @@ describe('BSwapV2Pair', () => {
       await token0.transfer(pair.address, input0Amount)
       await token1.transfer(pair.address, input1Amount)
       await expect(pair.swap(outputAmount.add(1), 0, wallet.address, '0x', overrides)).to.be.revertedWith(
-        'BSwapV2: K'
+        'Dynamic: K'
       )
       await pair.swap(outputAmount, 0, wallet.address, '0x', overrides)
     })

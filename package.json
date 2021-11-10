@@ -1,18 +1,18 @@
 {
-  "name": "@bswap/v2-core",
-  "description": "🎛 Core contracts for the BSwapV2 protocol",
+  "name": "@dynamic/v2-core",
+  "description": "🎛 Core contracts for the Dynamic protocol",
   "version": "1.0.1",
-  "homepage": "https://bswap.org",
+  "homepage": "https://dynamic.org",
   "repository": {
     "type": "git",
-    "url": "https://github.com/BSwap/bswap-v2-core"
+    "url": "https://github.com/Dynamic/dynamic-v2-core"
   },
   "keywords": [
-    "bswap",
+    "dynamic",
     "ethereum",
     "v2",
     "core",
-    "bswap-v2"
+    "dynamic-v2"
   ],
   "files": [
     "contracts",
