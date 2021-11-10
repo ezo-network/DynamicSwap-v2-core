@@ -46,7 +46,7 @@ contract DynamicFactory is IDynamicFactory {
         require(_feeToSetter != address(0) && _pairImplementation != address(0), "Address zero");
         feeToSetter = _feeToSetter;
         pairImplementation = _pairImplementation;
-        vars = [1 days, 100, 100, 100, 100, 100, 1, 45 minutes];
+        vars = [1 hours, 100, 100, 100, 100, 100, 1, 45 minutes];
     }
 
     function allPairsLength() external view returns (uint) {
