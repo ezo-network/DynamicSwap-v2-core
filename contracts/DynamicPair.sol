@@ -94,6 +94,10 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
     }
 
     function getAmountOut(uint amountIn, address tokenIn, address tokenOut) external view returns(uint amountOut) {
+        (amountOut,) = getAmountOutAndFee(amountIn, tokenIn, tokenOut);
+    }
+
+    function getAmountOutAndFee(uint amountIn, address tokenIn, address tokenOut) public view returns(uint amountOut, uint fee) {
         uint32[8] memory _vars = vars;
         uint ma;
         uint112 reserveIn = reserve0;
@@ -103,7 +107,6 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         uint priceBefore0 = uint(UQ112x112.encode(reserveOut).uqdiv(reserveIn));
         if (timeElapsed >= _vars[uint(Vars.periodMA)]) ma = priceBefore0;
         else ma = ((_vars[uint(Vars.periodMA)] - timeElapsed)*lastMA + priceBefore0*timeElapsed) / _vars[uint(Vars.periodMA)];
-        uint fee;
         uint k = uint(reserveIn) * reserveOut;
         if (tokenIn < tokenOut) {
             uint balance = reserveIn + amountIn;
@@ -121,12 +124,15 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         } else {
             fee = _vars[uint(Vars.minimalFee)];
         }
-        fee = 1000 - fee;
-        amountIn = amountIn * fee;
+        amountIn = amountIn * (1000 - fee);
         amountOut = reserveOut*amountIn / (reserveIn * 1000 + amountIn);
     }
 
     function getAmountIn(uint amountOut, address tokenIn, address tokenOut) external view returns(uint amountIn) {
+        (amountIn,) = getAmountInAndFee(amountOut, tokenIn, tokenOut);
+    }
+
+    function getAmountInAndFee(uint amountOut, address tokenIn, address tokenOut) public view returns(uint amountIn, uint fee) {
         uint32[8] memory _vars = vars;
         uint ma;
         uint112 reserveIn = reserve0;
@@ -136,7 +142,6 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         uint priceBefore0 = uint(UQ112x112.encode(reserveOut).uqdiv(reserveIn));
         if (timeElapsed >= _vars[uint(Vars.periodMA)]) ma = priceBefore0;
         else ma = ((_vars[uint(Vars.periodMA)] - timeElapsed)*lastMA + priceBefore0*timeElapsed) / _vars[uint(Vars.periodMA)];
-        uint fee;
         uint k = uint(reserveIn) * reserveOut;
         if (tokenIn < tokenOut) {
             uint balance = reserveOut - amountOut;
@@ -154,8 +159,7 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         } else {
             fee = _vars[uint(Vars.minimalFee)];
         }
-        fee = 1000 - fee;
-        amountOut = amountOut * 1000 / fee;
+        amountOut = amountOut * 1000 / (1000 - fee);
         amountIn = reserveIn*amountOut / (reserveOut - amountOut);
     }
     

@@ -21,5 +21,6 @@ interface IDynamicFactory {
     function setVars(uint varId, uint32 value) external;
     function setRouter(address _router) external;
     function setReimbursementContractAndVault(address _reimbursement, address _vault) external;
-    function withdrawFees() external;
+    function claimFee() external returns (uint256);
+    function getColletedFees() external view returns (uint256 feeAmount);
 }

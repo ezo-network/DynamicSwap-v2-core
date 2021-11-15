@@ -66,7 +66,7 @@ contract DynamicFactory is IDynamicFactory {
     // 3 - protect from dumping token against WETH
     function createPair(address tokenA, address tokenB, uint8 circuitBreaker) external returns (address pair) {
         require(circuitBreaker < 4, "Wrong circuitBreaker");
-        return _createPair(tokenA, tokenB, circuitBreaker+4);
+        return _createPair(tokenA, tokenB, circuitBreaker);
     }
     
     function createPrivatePair(address tokenA, address tokenB, uint8 circuitBreaker) external returns (address pair) {
@@ -90,7 +90,10 @@ contract DynamicFactory is IDynamicFactory {
         uint32[8] memory _vars = vars;
         address WETH = IDynamicRouter02(uniV2Router).WETH();
         uint8 isPrivate;
-        if (circuitBreaker > 3) isPrivate = 1;
+        if (circuitBreaker > 3) {
+            isPrivate = 1;
+            circuitBreaker = circuitBreaker - 4;
+        }
         if ((circuitBreaker == 3 && token0 == WETH) || circuitBreaker == 2) {
             _vars[uint(Vars.maxDump1)] = 10;    // 10% allowed dump during the time frame
             _vars[uint(Vars.maxTxDump1)] = 0;    // 0% allowed dump in single transaction
@@ -131,6 +134,7 @@ contract DynamicFactory is IDynamicFactory {
         require(isPair[msg.sender], "Only pair");
         address WETH = IDynamicRouter02(uniV2Router).WETH();
         address _dynamic = dynamic;
+        if ((token0 == _dynamic || token1 == _dynamic) && (token0 == WETH || token1 == WETH)) return false; // protection from loop when swap dynamic/WETH
         address _dynamicPair = getPair[_dynamic][WETH];
         if (_dynamicPair == address(0)) return false;
         address _factory = IDynamicRouter02(uniV2Router).factory();
@@ -162,6 +166,7 @@ contract DynamicFactory is IDynamicFactory {
         return true;
     }
 
+    // swap token to WETH and return WETH amount
     function _swapFee(address _factory, address WETH, address _token, uint _feeAmount) internal returns(uint amountOut) {
         if (_token == WETH) {
             _safeTransferFrom(_token, msg.sender, address(this), _feeAmount);
@@ -245,6 +250,7 @@ contract DynamicFactory is IDynamicFactory {
 
 
     function getColletedFees() external view returns (uint256 feeAmount) {
+        address WETH = IDynamicRouter02(uniV2Router).WETH();
         feeAmount = IERC20(WETH).balanceOf(address(this));
     }
 
