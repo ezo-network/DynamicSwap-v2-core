@@ -16,12 +16,12 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
     enum Vars {timeFrame, maxDump0, maxDump1, maxTxDump0, maxTxDump1, coefficient, minimalFee, periodMA}
     uint32[8] public vars; // timeFrame, maxDump0, maxDump1, maxTxDump0, maxTxDump1, coefficient, minimalFee, periodM
     //timeFrame = 1 days;  // during this time frame rate of reserve1/reserve0 should be in range [baseLinePrice0*(1-maxDump0), baseLinePrice0*(1+maxDump1)]
-    //maxDump0 = 100;   // maximum allowed dump (in percentage) of reserve1/reserve0 rate during time frame relatively the baseline
-    //maxDump1 = 100;   // maximum allowed dump (in percentage) of reserve0/reserve1 rate during time frame relatively the baseline
-    //maxTxDump0 = 100; // maximum allowed dump (in percentage) of token0 price per transaction
-    //maxTxDump1 = 100; // maximum allowed dump (in percentage) of token1 price per transaction
-    //coefficient = 100; // coefficient (in percentage) to transform price growing into fee. ie
-    //minimalFee = 1;   // Minimal fee percentage (with 1 decimals) applied to transaction. I.e. 1 = 0.1%
+    //maxDump0 = 10000;   // maximum allowed dump (in percentage with 2 decimals) of reserve1/reserve0 rate during time frame relatively the baseline
+    //maxDump1 = 10000;   // maximum allowed dump (in percentage with 2 decimals) of reserve0/reserve1 rate during time frame relatively the baseline
+    //maxTxDump0 = 10000; // maximum allowed dump (in percentage with 2 decimals) of token0 price per transaction
+    //maxTxDump1 = 10000; // maximum allowed dump (in percentage with 2 decimals) of token1 price per transaction
+    //coefficient = 10000; // coefficient (in percentage with 2 decimals) to transform price growing into fee. ie
+    //minimalFee = 10;   // Minimal fee percentage (with 2 decimals) applied to transaction. I.e. 10 = 0.1%
     //periodMA = 45*60;  // MA period in seconds
 
     uint256 public baseLinePrice0;// base line of reserve1/reserve0 rate fixed on beginning od each time frame.
@@ -111,21 +111,21 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         if (tokenIn < tokenOut) {
             uint balance = reserveIn + amountIn;
             uint priceAfter0 = uint(UQ112x112.encode(uint112(k/balance)).uqdiv(uint112(balance)));
-            fee = priceAfter0 * 1000 / ma;
+            fee = priceAfter0 * 10000 / ma;
         } else {
             uint balance = reserveOut + amountIn;
             uint priceAfter0 = uint(UQ112x112.encode(uint112(balance)).uqdiv(uint112(k/balance)));
-            fee = ma * 1000 / priceAfter0;
+            fee = ma * 10000 / priceAfter0;
             (reserveIn, reserveOut) = (reserveOut, reserveIn);
         }
-        if (fee < 1000) {
-            fee = (1000 - fee) * _vars[uint(Vars.coefficient)] / 100;
+        if (fee < 10000) {
+            fee = (10000 - fee) * _vars[uint(Vars.coefficient)] / 10000;
             if (fee < _vars[uint(Vars.minimalFee)]) fee = _vars[uint(Vars.minimalFee)];
         } else {
             fee = _vars[uint(Vars.minimalFee)];
         }
-        amountIn = amountIn * (1000 - fee);
-        amountOut = reserveOut*amountIn / (reserveIn * 1000 + amountIn);
+        amountIn = amountIn * (10000 - fee);
+        amountOut = reserveOut*amountIn / (reserveIn * 10000 + amountIn);
     }
 
     function getAmountIn(uint amountOut, address tokenIn, address tokenOut) external view returns(uint amountIn) {
@@ -146,20 +146,20 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         if (tokenIn < tokenOut) {
             uint balance = reserveOut - amountOut;
             uint priceAfter0 = uint(UQ112x112.encode(uint112(balance)).uqdiv(uint112(k/balance)));
-            fee = priceAfter0 * 1000 / ma;
+            fee = priceAfter0 * 10000 / ma;
         } else {
             uint balance = reserveIn - amountOut;
             uint priceAfter0 = uint(UQ112x112.encode(uint112(k/balance)).uqdiv(uint112(balance)));
-            fee = ma * 1000 / priceAfter0;
+            fee = ma * 10000 / priceAfter0;
             (reserveIn, reserveOut) = (reserveOut, reserveIn);
         }
-        if (fee < 1000) {
-            fee = (1000 - fee) * _vars[uint(Vars.coefficient)] / 100;
+        if (fee < 10000) {
+            fee = (10000 - fee) * _vars[uint(Vars.coefficient)] / 10000;
             if (fee < _vars[uint(Vars.minimalFee)]) fee = _vars[uint(Vars.minimalFee)];
         } else {
             fee = _vars[uint(Vars.minimalFee)];
         }
-        amountOut = amountOut * 1000 / (1000 - fee);
+        amountOut = amountOut * 10000 / (10000 - fee);
         amountIn = reserveIn*amountOut / (reserveOut - amountOut);
     }
     
@@ -176,8 +176,8 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         uint32[8] memory _vars = vars;
         {
         // check transaction dump range
-        require(priceAfter0 * 100 / priceBefore0 >= (uint(100).sub(_vars[uint(Vars.maxTxDump0)])) &&
-            priceBefore0 * 100 / priceAfter0 >= (uint(100).sub(_vars[uint(Vars.maxTxDump1)])),
+        require(priceAfter0 * 10000 / priceBefore0 >= (uint(10000).sub(_vars[uint(Vars.maxTxDump0)])) &&
+            priceBefore0 * 10000 / priceAfter0 >= (uint(10000).sub(_vars[uint(Vars.maxTxDump1)])),
             "Slippage out of allowed range"
         );
         // check time frame dump range
@@ -187,8 +187,8 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
             baseLinePrice0 = _baseLinePrice0;
         }
         if (_baseLinePrice0 !=0)
-            require(priceAfter0 * 100 / _baseLinePrice0 >= (uint(100).sub(_vars[uint(Vars.maxDump0)])) &&
-                _baseLinePrice0 * 100 / priceAfter0 >= (uint(100).sub(_vars[uint(Vars.maxDump1)])),
+            require(priceAfter0 * 10000 / _baseLinePrice0 >= (uint(10000).sub(_vars[uint(Vars.maxDump0)])) &&
+                _baseLinePrice0 * 10000 / priceAfter0 >= (uint(10000).sub(_vars[uint(Vars.maxDump1)])),
                 "Slippage out of time frame allowed range"
             );
         }
@@ -199,14 +199,14 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         if (timeElapsed >= _vars[uint(Vars.periodMA)]) ma = priceBefore0;
         else ma = ((_vars[uint(Vars.periodMA)] - timeElapsed)*lastMA + priceBefore0*timeElapsed) / _vars[uint(Vars.periodMA)];
         lastMA = ma;
-        fee0 = priceAfter0 * 1000 / ma;
-        if (fee0 <= 1000) {
-            fee0 = (1000 - fee0) * _vars[uint(Vars.coefficient)] / 100;
+        fee0 = priceAfter0 * 10000 / ma;
+        if (fee0 <= 10000) {
+            fee0 = (10000 - fee0) * _vars[uint(Vars.coefficient)] / 10000;
             if (fee0 < _vars[uint(Vars.minimalFee)]) fee0 = _vars[uint(Vars.minimalFee)];
             fee1 = _vars[uint(Vars.minimalFee)];   // minimalFee when price drop
         } else {
-            // fee1 = 1000*1000 / fee0
-            fee1 = uint(1000).sub(1000000 / fee0) * _vars[uint(Vars.coefficient)] / 100;
+            // fee1 = 10000*10000 / fee0
+            fee1 = uint(10000).sub(100000000 / fee0) * _vars[uint(Vars.coefficient)] / 10000;
             if (fee1 < _vars[uint(Vars.minimalFee)]) fee1 = _vars[uint(Vars.minimalFee)];
             fee0 = _vars[uint(Vars.minimalFee)];   // minimalFee when price drop
         }
@@ -332,8 +332,8 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         address _token1 = token1;
         if (to != factory) {    // avoid endless loop of fee swapping
             (fee0, fee1) = _getFeeAndDumpProtection(balance0, balance1, _reserve0, _reserve1);
-            fee0 = amount0In.mul(fee0) / 1000;
-            fee1 = amount1In.mul(fee1) / 1000;
+            fee0 = amount0In.mul(fee0) / 10000;
+            fee1 = amount1In.mul(fee1) / 10000;
             if (fee0 > 0) IERC20(_token0).approve(factory, fee0);
             if (fee1 > 0) IERC20(_token1).approve(factory, fee1);
             IDynamicFactory(factory).swapFee(_token0, _token1, fee0, fee1);
@@ -342,6 +342,8 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         //uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
         require((balance0.sub(fee0)).mul(balance1.sub(fee1)) >= uint(_reserve0).mul(_reserve1), 'Dynamic: K');
         //_update(IERC20(_token0).balanceOf(address(this)), IERC20(_token1).balanceOf(address(this)), _reserve0, _reserve1);
+        if (fee0 > 0) balance0 = IERC20(_token0).balanceOf(address(this));
+        if (fee1 > 0) balance1 = IERC20(_token1).balanceOf(address(this));
         }
         _update(balance0, balance1, _reserve0, _reserve1);
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
@@ -372,7 +374,7 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         if (varId == uint(Vars.timeFrame) || varId == uint(Vars.periodMA))
             require(value != 0, "Wrong time frame");
         else
-            require(value <= 100, "Wrong percentage");
+            require(value <= 10000, "Wrong percentage");
         vars[varId] = value;
     }
 

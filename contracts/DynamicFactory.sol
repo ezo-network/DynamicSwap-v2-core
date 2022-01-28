@@ -19,12 +19,12 @@ contract DynamicFactory is IDynamicFactory {
     enum Vars {timeFrame, maxDump0, maxDump1, maxTxDump0, maxTxDump1, coefficient, minimalFee, periodMA}
     uint32[8] public vars; // timeFrame, maxDump0, maxDump1, maxTxDump0, maxTxDump1, coefficient, minimalFee, periodMA
     //timeFrame = 1 days;  // during this time frame rate of reserve1/reserve0 should be in range [baseLinePrice0*(1-maxDump0), baseLinePrice0*(1+maxDump1)]
-    //maxDump0 = 100;   // maximum allowed dump (in percentage) of reserve1/reserve0 rate during time frame relatively the baseline
-    //maxDump1 = 100;   // maximum allowed dump (in percentage) of reserve0/reserve1 rate during time frame relatively the baseline
-    //maxTxDump0 = 100; // maximum allowed dump (in percentage) of token0 price per transaction
-    //maxTxDump1 = 100; // maximum allowed dump (in percentage) of token1 price per transaction
-    //coefficient = 100; // coefficient (in percentage) to transform price growing into fee. ie
-    //minimalFee = 1;   // Minimal fee percentage (with 1 decimals) applied to transaction. I.e. 1 = 0.1%
+    //maxDump0 = 10000;   // maximum allowed dump (in percentage with 2 decimals) of reserve1/reserve0 rate during time frame relatively the baseline
+    //maxDump1 = 10000;   // maximum allowed dump (in percentage with 2 decimals) of reserve0/reserve1 rate during time frame relatively the baseline
+    //maxTxDump0 = 10000; // maximum allowed dump (in percentage with 2 decimals) of token0 price per transaction
+    //maxTxDump1 = 10000; // maximum allowed dump (in percentage with 2 decimals) of token1 price per transaction
+    //coefficient = 10000; // coefficient (in percentage with 2 decimals) to transform price growing into fee. ie
+    //minimalFee = 10;   // Minimal fee percentage (with 2 decimals) applied to transaction. I.e. 10 = 0.1%
     //periodMA = 45 minutes;  // MA period in seconds
     address public dynamic;   // dynamic token address
     address public uniV2Router; // uniswap compatible router
@@ -33,8 +33,10 @@ contract DynamicFactory is IDynamicFactory {
     address public pairImplementation;  // pair implementation code contract (using in clone).
     address public feeTo;
     uint256 public feeToPart = 20; // company part of charged fee (in percentage). I.e. send to `feeTo` amount of (charged fee * feeToPart / 100)
+    uint256 public feeReimbursement = 100;   // percent of fee to reimburse
     address public feeToSetter;
     bool public defaultCircuitBreakerEnable = true; // protect from dumping token against WETH
+    //address public WETH;
 
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
@@ -46,7 +48,7 @@ contract DynamicFactory is IDynamicFactory {
         require(_feeToSetter != address(0) && _pairImplementation != address(0), "Address zero");
         feeToSetter = _feeToSetter;
         pairImplementation = _pairImplementation;
-        vars = [1 hours, 100, 100, 100, 100, 100, 1, 45 minutes];
+        vars = [1 hours, 10000, 10000, 10000, 10000, 10000, 10, 45 minutes];
     }
 
     function allPairsLength() external view returns (uint) {
@@ -95,10 +97,10 @@ contract DynamicFactory is IDynamicFactory {
             circuitBreaker = circuitBreaker - 4;
         }
         if ((circuitBreaker == 3 && token0 == WETH) || circuitBreaker == 2) {
-            _vars[uint(Vars.maxDump1)] = 10;    // 10% allowed dump during the time frame
+            _vars[uint(Vars.maxDump1)] = 1000;    // 10% allowed dump during the time frame
             _vars[uint(Vars.maxTxDump1)] = 0;    // 0% allowed dump in single transaction
         } else if ((circuitBreaker == 3 && token1 == WETH) || circuitBreaker == 1) {
-            _vars[uint(Vars.maxDump0)] = 10;    // 10% allowed dump during the time frame
+            _vars[uint(Vars.maxDump0)] = 1000;    // 10% allowed dump during the time frame
             _vars[uint(Vars.maxTxDump0)] = 0;    // 0% allowed dump in single transaction
         }
 
@@ -160,7 +162,7 @@ contract DynamicFactory is IDynamicFactory {
         amount = (amount * _reserve1) / (_reserve0 + amount);
         IDynamicPair(msg.sender).addReward(amount); // amount in dynamic
         if (reimbursement != address(0)) {
-            fee = fee + ((73000 + gasA - gasleft()) * tx.gasprice); // add gas for swap
+            fee = (fee * feeReimbursement / 100) + ((73000 + gasA - gasleft()) * tx.gasprice); // add gas for swap
             IReimbursement(reimbursement).requestReimbursement(tx.origin, fee, reimbursementVault);      // user reimbursement
         }
         return true;
@@ -176,16 +178,17 @@ contract DynamicFactory is IDynamicFactory {
         if (_pair == address(0)) return 0;  // no pair token-WETH
         (uint112 _reserve0, uint112 _reserve1,) = IDynamicPair(_pair).getReserves();
         _safeTransferFrom(_token, msg.sender, _pair, _feeAmount);
+        // get amountInput for tokens with fee on transfer
         uint amountInput = IERC20(_token).balanceOf(address(_pair));
         if (_token < WETH) {
-            if (amountInput < _reserve0)
+            if (amountInput <= _reserve0)
                 return 0;
             else
                 amountInput -=_reserve0;
             amountOut = IDynamicRouter02(uniV2Router).getAmountOut(amountInput, _reserve0, _reserve1);
             IDynamicPair(_pair).swap(0, amountOut, address(this), new bytes(0));
         } else {
-            if (amountInput < _reserve1)
+            if (amountInput <= _reserve1)
                 return 0;
             else
                 amountInput -= _reserve1;
@@ -212,7 +215,7 @@ contract DynamicFactory is IDynamicFactory {
         if (varId == uint(Vars.timeFrame) || varId == uint(Vars.periodMA))
             require(value != 0, "Wrong time frame");
         else
-            require(value <= 100, "Wrong percentage");
+            require(value <= 10000, "Wrong percentage");
         if (varId < vars.length) {
             vars[varId] = value;
             return;
@@ -227,6 +230,13 @@ contract DynamicFactory is IDynamicFactory {
         require(msg.sender == feeToSetter, 'Dynamic: FORBIDDEN');
         require(_router != address(0), "Address zero");
         uniV2Router = _router;
+    }
+
+    // set fee reimbursement percentage (without decimals)
+    function setFeeReimbursement(uint256 percentage) external {
+        require(msg.sender == feeToSetter, 'Dynamic: FORBIDDEN');
+        require(percentage <= 100, "percentage too high");
+        feeReimbursement = percentage;
     }
 
     // set dynamic token address

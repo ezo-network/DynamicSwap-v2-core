@@ -131,6 +131,8 @@ contract DynamicVoting is DynamicERC20 {
         voted[msg.sender][_ballotId] = true;
         if(_checkMajority(rules[b.ruleId].majority, _ballotId)) {
             _executeBallot(_ballotId);
+        } else if (locked[msg.sender] < closeVote) {
+            locked[msg.sender] = closeVote;
         }
         return true;
     }
@@ -156,6 +158,8 @@ contract DynamicVoting is DynamicERC20 {
         
         if (_checkMajority(r.majority, ballotIds)) {
             _executeBallot(ballotIds);
+        } else if (locked[msg.sender] < closeVote) {
+            locked[msg.sender] = closeVote;
         }
     }
     

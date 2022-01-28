@@ -24,6 +24,7 @@ contract DynamicERC20 is IDynamicERC20 {
     // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     bytes32 public constant PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
     mapping(address => uint) public nonces;
+    mapping(address => uint) public locked;   // lock token until end of voting (timestamp)
 
     event Approval(address indexed owner, address indexed spender, uint value);
     event Transfer(address indexed from, address indexed to, uint value);
@@ -97,7 +98,7 @@ contract DynamicERC20 is IDynamicERC20 {
     }
 
     function _transfer(address from, address to, uint value) private {
-        require(to == address(this), "Remove liquidity allowed only");
+        require(locked[from] < block.timestamp, "LP locked until end of voting");
         _updateTotalWeight();
         uint weight = _getWeight(from);
         uint transferWeight = weight.mul(value) / balanceOf[from]; // transferWeight is proportional of transferring value
