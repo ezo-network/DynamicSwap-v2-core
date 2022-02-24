@@ -4,6 +4,7 @@ interface IDynamicFactory {
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
 
     function dynamic() external view returns (address);
+    function WETH() external view returns (address);
     function uniV2Router() external view returns (address);
     function feeTo() external view returns (address);
     function feeToSetter() external view returns (address);

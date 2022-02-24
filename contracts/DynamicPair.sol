@@ -99,33 +99,72 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
 
     function getAmountOutAndFee(uint amountIn, address tokenIn, address tokenOut) public view returns(uint amountOut, uint fee) {
         uint32[8] memory _vars = vars;
-        uint ma;
-        uint112 reserveIn = reserve0;
+        uint balanceIn;
         uint112 reserveOut = reserve1;
+        uint112 reserveIn = reserve0;
+        uint ma;
+        {
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);        
         uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
         uint priceBefore0 = uint(UQ112x112.encode(reserveOut).uqdiv(reserveIn));
         if (timeElapsed >= _vars[uint(Vars.periodMA)]) ma = priceBefore0;
         else ma = ((_vars[uint(Vars.periodMA)] - timeElapsed)*lastMA + priceBefore0*timeElapsed) / _vars[uint(Vars.periodMA)];
-        uint k = uint(reserveIn) * reserveOut;
-        if (tokenIn < tokenOut) {
-            uint balance = reserveIn + amountIn;
-            uint priceAfter0 = uint(UQ112x112.encode(uint112(k/balance)).uqdiv(uint112(balance)));
-            fee = priceAfter0 * 10000 / ma;
-        } else {
-            uint balance = reserveOut + amountIn;
-            uint priceAfter0 = uint(UQ112x112.encode(uint112(balance)).uqdiv(uint112(k/balance)));
-            fee = ma * 10000 / priceAfter0;
-            (reserveIn, reserveOut) = (reserveOut, reserveIn);
         }
-        if (fee < 10000) {
-            fee = (10000 - fee) * _vars[uint(Vars.coefficient)] / 10000;
-            if (fee < _vars[uint(Vars.minimalFee)]) fee = _vars[uint(Vars.minimalFee)];
+        {
+        amountOut = amountIn.mul(_vars[uint(Vars.coefficient)]) / 10000;    // reuse amountOut
+        uint b;
+        uint c;
+        ma = ma / 2**56;
+        {
+        uint k = uint(reserveIn).mul(reserveOut);// / denominator;
+        uint denominator = _getDenominator(k);
+        k = k / denominator;
+        if (tokenIn < tokenOut) {
+            balanceIn = amountIn.add(reserveIn);
+            b = balanceIn.mul(ma) / 2**56;
+            b = b.mul(balanceIn.sub(amountOut));
+            b = b / denominator;
+            //b = (uint(reserveIn).mul(ma) / 2**56).mul(balanceIn) / denominator;
+            c = (k.mul(ma) / 2**56).mul(balanceIn);
         } else {
+            (reserveIn, reserveOut) = (reserveOut, reserveIn);
+            balanceIn = amountIn.add(reserveIn);
+            b = balanceIn.mul(2**56) / ma;
+            b = b.mul(balanceIn.sub(amountOut));
+            b = b / denominator;
+            //b = (uint(reserveIn).mul(2**56) / ma).mul(balanceIn) / denominator;
+            c = (k.mul(2**56) / ma).mul(balanceIn);
+        }
+                
+        if (amountOut != 0) {
+            c = c / denominator;
+            fee = sqrt(b.mul(b).add(c.mul(amountOut*4)));
+            amountOut = (fee.sub(b).mul(denominator))/(amountOut*2);
+        } else {
+            amountOut = c / b;
+        }
+        }
+        }
+
+
+        // amountOut = balanceOut
+        if (tokenIn < tokenOut) {
+            fee = amountOut.mul(10000).mul(2**56)/(balanceIn.mul(ma));
+        } else {
+            fee =amountOut.mul(10000).mul(ma)/(balanceIn.mul(2**56));
+        }
+        fee = fee < 10000 ? 10000 - fee : 0;
+        amountOut = uint(reserveOut).sub(amountOut);
+
+        if (fee < _vars[uint(Vars.minimalFee)]) {
             fee = _vars[uint(Vars.minimalFee)];
         }
-        amountIn = amountIn * (10000 - fee);
-        amountOut = reserveOut*amountIn / (reserveIn * 10000 + amountIn);
+        if (fee == _vars[uint(Vars.minimalFee)] || amountIn < 1e14) {
+            uint amountInWithFee = amountIn.mul(10000 - fee);
+            uint numerator = amountInWithFee.mul(reserveOut);
+            uint denominator = uint(reserveIn).mul(10000).add(amountInWithFee);
+            amountOut = numerator / denominator;            
+        }
     }
 
     function getAmountIn(uint amountOut, address tokenIn, address tokenOut) external view returns(uint amountIn) {
@@ -137,30 +176,67 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         uint ma;
         uint112 reserveIn = reserve0;
         uint112 reserveOut = reserve1;
+        uint balanceOut;
+        {
+        {
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);        
         uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
         uint priceBefore0 = uint(UQ112x112.encode(reserveOut).uqdiv(reserveIn));
         if (timeElapsed >= _vars[uint(Vars.periodMA)]) ma = priceBefore0;
         else ma = ((_vars[uint(Vars.periodMA)] - timeElapsed)*lastMA + priceBefore0*timeElapsed) / _vars[uint(Vars.periodMA)];
-        uint k = uint(reserveIn) * reserveOut;
+        }
+        uint b;
+        uint c;
+        uint denominator;
+        ma = ma / 2**56;
+        {
         if (tokenIn < tokenOut) {
-            uint balance = reserveOut - amountOut;
-            uint priceAfter0 = uint(UQ112x112.encode(uint112(balance)).uqdiv(uint112(k/balance)));
-            fee = priceAfter0 * 10000 / ma;
+            balanceOut = uint(reserveOut).sub(amountOut);
+            fee = uint(reserveIn).mul(ma) / 2**56;
+            amountIn = balanceOut.mul(10000 - _vars[uint(Vars.coefficient)]) / 10000;
+            amountIn = amountIn.mul(ma) / 2**56; // reuse amountIn
         } else {
-            uint balance = reserveIn - amountOut;
-            uint priceAfter0 = uint(UQ112x112.encode(uint112(k/balance)).uqdiv(uint112(balance)));
-            fee = ma * 10000 / priceAfter0;
             (reserveIn, reserveOut) = (reserveOut, reserveIn);
+            balanceOut = uint(reserveOut).sub(amountOut);
+            fee = uint(reserveIn).mul(2**56) / ma; // reuse fee
+            amountIn = balanceOut.mul(10000 - _vars[uint(Vars.coefficient)]) / 10000;
+            amountIn = amountIn.mul(2**56) / ma; // reuse amountIn
+
         }
-        if (fee < 10000) {
-            fee = (10000 - fee) * _vars[uint(Vars.coefficient)] / 10000;
-            if (fee < _vars[uint(Vars.minimalFee)]) fee = _vars[uint(Vars.minimalFee)];
+        b = fee.mul(balanceOut).mul(20000 - _vars[uint(Vars.coefficient)]) / 10000;
+        denominator = _getDenominator(b);
+        b = b.add((balanceOut.mul(_vars[uint(Vars.coefficient)])/10000).mul(balanceOut));
+        b = b.sub(fee.mul(reserveOut));
+        b = b / denominator;
+
+        c = fee.mul(reserveIn) / denominator;
+        c = c.mul(amountOut);        
+        }
+        if (amountIn != 0) {
+            c = c / denominator;
+            fee = sqrt(b.mul(b).add(c.mul(amountIn*4)));
+            amountIn = (fee.sub(b).mul(denominator))/(amountIn*2);
         } else {
-            fee = _vars[uint(Vars.minimalFee)];
+            amountIn = c / b;
         }
-        amountOut = amountOut * 10000 / (10000 - fee);
-        amountIn = reserveIn*amountOut / (reserveOut - amountOut);
+        }
+        
+        {
+        uint balanceIn = amountIn.add(reserveIn);
+        if (tokenIn < tokenOut) {
+            fee = balanceOut.mul(10000 * 2**56)/(balanceIn.mul(ma));
+        } else {
+            fee = balanceOut.mul(10000 * ma)/(balanceIn.mul(2**56));
+        }
+        fee = fee < 10000 ? 10000 - fee : 0;
+
+        if (fee < _vars[uint(Vars.minimalFee)]) {
+            fee = _vars[uint(Vars.minimalFee)];
+            uint numerator = uint(reserveIn).mul(amountOut).mul(10000);
+            uint denominator = uint(reserveOut).sub(amountOut).mul(10000 - fee);
+            amountIn = (numerator / denominator).add(1);
+        }
+        }
     }
     
     function _getFeeAndDumpProtection(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private returns(uint fee0, uint fee1){
@@ -183,7 +259,7 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         // check time frame dump range
         uint _baseLinePrice0 = baseLinePrice0;
         if (blockTimestamp/_vars[uint(Vars.timeFrame)] != blockTimestampLast/_vars[uint(Vars.timeFrame)]) {   //new time frame 
-            _baseLinePrice0 = uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0));
+            _baseLinePrice0 = priceBefore0; // uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0));
             baseLinePrice0 = _baseLinePrice0;
         }
         if (_baseLinePrice0 !=0)
@@ -200,16 +276,32 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         else ma = ((_vars[uint(Vars.periodMA)] - timeElapsed)*lastMA + priceBefore0*timeElapsed) / _vars[uint(Vars.periodMA)];
         lastMA = ma;
         fee0 = priceAfter0 * 10000 / ma;
-        if (fee0 <= 10000) {
-            fee0 = (10000 - fee0) * _vars[uint(Vars.coefficient)] / 10000;
-            if (fee0 < _vars[uint(Vars.minimalFee)]) fee0 = _vars[uint(Vars.minimalFee)];
-            fee1 = _vars[uint(Vars.minimalFee)];   // minimalFee when price drop
-        } else {
-            // fee1 = 10000*10000 / fee0
-            fee1 = uint(10000).sub(100000000 / fee0) * _vars[uint(Vars.coefficient)] / 10000;
-            if (fee1 < _vars[uint(Vars.minimalFee)]) fee1 = _vars[uint(Vars.minimalFee)];
-            fee0 = _vars[uint(Vars.minimalFee)];   // minimalFee when price drop
+        
+        // fee should be less than 1
+        if (fee0 == 10000) fee0--;
+        fee1 = fee0 > 10000 ? (9999 - 100000000 / fee0) * _vars[uint(Vars.coefficient)] / 10000 : _vars[uint(Vars.minimalFee)];
+        fee0 = fee0 < 10000 ? (9999 - fee0) * _vars[uint(Vars.coefficient)] / 10000 : _vars[uint(Vars.minimalFee)];
+        if (fee1 < _vars[uint(Vars.minimalFee)]) fee1 = _vars[uint(Vars.minimalFee)];
+        if (fee0 < _vars[uint(Vars.minimalFee)]) fee0 = _vars[uint(Vars.minimalFee)];
         }
+    }
+
+    function _getDenominator(uint v) internal pure returns(uint denominator) {
+        if (v>1e54) denominator = 1e27;
+        else if (v>1e36) denominator = 1e18;
+        else denominator = 1e9;
+    }
+
+    function sqrt(uint y) internal pure returns (uint z) {
+        if (y > 3) {
+            z = y;
+            uint x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
         }
     }
 
@@ -325,6 +417,7 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         uint amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
         uint amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
         require(amount0In > 0 || amount1In > 0, 'Dynamic: INSUFFICIENT_INPUT_AMOUNT');
+        emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
         { // scope for reserve{0,1}Adjusted, avoids stack too deep errors
         uint fee0;
         uint fee1;
@@ -332,8 +425,29 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         address _token1 = token1;
         if (to != factory) {    // avoid endless loop of fee swapping
             (fee0, fee1) = _getFeeAndDumpProtection(balance0, balance1, _reserve0, _reserve1);
-            fee0 = amount0In.mul(fee0) / 10000;
-            fee1 = amount1In.mul(fee1) / 10000;
+            if (amount0In != 0) { 
+                fee1 = amount0In.mul(fee0) / 10000; // fee by calculation
+                fee0 = balance0.sub(uint(_reserve0) * uint(_reserve1) / balance1 + 1);
+                require(fee0 >= fee1, "fee0 lower");
+                if (_token0 == IDynamicFactory(factory).WETH()) {
+                    fee1 = 0; // take fee in token0 (tokenIn)
+                } else {
+                    //take fee in token1 (tokenOut) by default
+                    fee1 = balance1.sub(uint(_reserve0) * uint(_reserve1) / balance0 + 1);
+                    fee0 = 0;
+                }
+            } else if (amount1In != 0) {
+                fee0 = amount1In.mul(fee1) / 10000; // fee by calculation
+                fee1 = balance1.sub(uint(_reserve0) * uint(_reserve1) / balance0 + 1);
+                require(fee1 >= fee0, "fee1 lower");
+                if (_token1 == IDynamicFactory(factory).WETH()) {
+                    fee0 = 0; // take fee in token1 (tokenIn)
+                } else {
+                    //take fee in token0 (tokenOut) by default
+                    fee0 = balance0.sub(uint(_reserve0) * uint(_reserve1) / balance1 + 1);
+                    fee1 = 0;
+                } 
+            }
             if (fee0 > 0) IERC20(_token0).approve(factory, fee0);
             if (fee1 > 0) IERC20(_token1).approve(factory, fee1);
             IDynamicFactory(factory).swapFee(_token0, _token1, fee0, fee1);
@@ -346,7 +460,6 @@ contract DynamicPair is IDynamicPair, DynamicVoting {
         if (fee1 > 0) balance1 = IERC20(_token1).balanceOf(address(this));
         }
         _update(balance0, balance1, _reserve0, _reserve1);
-        emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 
     // force balances to match reserves

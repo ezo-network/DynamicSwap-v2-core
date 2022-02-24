@@ -36,7 +36,7 @@ contract DynamicFactory is IDynamicFactory {
     uint256 public feeReimbursement = 100;   // percent of fee to reimburse
     address public feeToSetter;
     bool public defaultCircuitBreakerEnable = true; // protect from dumping token against WETH
-    //address public WETH;
+    address public WETH;
 
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
@@ -90,7 +90,6 @@ contract DynamicFactory is IDynamicFactory {
         }
         */
         uint32[8] memory _vars = vars;
-        address WETH = IDynamicRouter02(uniV2Router).WETH();
         uint8 isPrivate;
         if (circuitBreaker > 3) {
             isPrivate = 1;
@@ -134,16 +133,15 @@ contract DynamicFactory is IDynamicFactory {
         //return false; // TEST
         uint gasA = gasleft();
         require(isPair[msg.sender], "Only pair");
-        address WETH = IDynamicRouter02(uniV2Router).WETH();
+        address _WETH = WETH;
         address _dynamic = dynamic;
-        if ((token0 == _dynamic || token1 == _dynamic) && (token0 == WETH || token1 == WETH)) return false; // protection from loop when swap dynamic/WETH
-        address _dynamicPair = getPair[_dynamic][WETH];
+        if ((token0 == _dynamic || token1 == _dynamic) && (token0 == _WETH || token1 == _WETH)) return false; // protection from loop when swap dynamic/WETH
+        address _dynamicPair = getPair[_dynamic][_WETH];
         if (_dynamicPair == address(0)) return false;
-        address _factory = IDynamicRouter02(uniV2Router).factory();
         uint amount;
         uint fee;
-        if (fee0 != 0) amount = _swapFee(_factory, WETH, token0, fee0);
-        if (fee1 != 0) amount += _swapFee(_factory, WETH, token1, fee1);
+        if (fee0 != 0) amount = _swapFee(_WETH, token0, fee0);
+        if (fee1 != 0) amount += _swapFee(_WETH, token1, fee1);
         if (amount == 0) {
             if (reimbursement != address(0)) {
                 fee = ((73000 + gasA - gasleft()) * tx.gasprice); // add gas for swap
@@ -152,7 +150,7 @@ contract DynamicFactory is IDynamicFactory {
             return false;
         }
         (uint112 _reserve0, uint112 _reserve1,) = IDynamicPair(_dynamicPair).getReserves();
-        if (WETH > _dynamic) {
+        if (_WETH > _dynamic) {
             (_reserve0, _reserve1) = (_reserve1, _reserve0);    // WETH amount = _reserve0
         }
         fee = amount;
@@ -169,30 +167,46 @@ contract DynamicFactory is IDynamicFactory {
     }
 
     // swap token to WETH and return WETH amount
-    function _swapFee(address _factory, address WETH, address _token, uint _feeAmount) internal returns(uint amountOut) {
-        if (_token == WETH) {
+    function _swapFee(address _WETH, address _token, uint _feeAmount) internal returns(uint amountOut) {
+        if (_token == _WETH) {
             _safeTransferFrom(_token, msg.sender, address(this), _feeAmount);
             return _feeAmount;
         }
-        address _pair = IDynamicFactory(_factory).getPair(_token, WETH);
-        if (_pair == address(0)) return 0;  // no pair token-WETH
-        (uint112 _reserve0, uint112 _reserve1,) = IDynamicPair(_pair).getReserves();
+        bool localPair;
+        address _pair = getPair[_token][_WETH];
+        if (_pair == address(0)) {
+            address _factory = IDynamicRouter02(uniV2Router).factory();
+            _pair = IDynamicFactory(_factory).getPair(_token, _WETH);
+            if (_pair == address(0)) return 0;  // no pair token-WETH
+        } else {
+            localPair == true;
+        }
+        if (_pair == msg.sender) return 0;  // avoid deadlock on recursion
         _safeTransferFrom(_token, msg.sender, _pair, _feeAmount);
+        (uint112 _reserve0, uint112 _reserve1,) = IDynamicPair(_pair).getReserves();
         // get amountInput for tokens with fee on transfer
         uint amountInput = IERC20(_token).balanceOf(address(_pair));
-        if (_token < WETH) {
+        if (_token < _WETH) {
             if (amountInput <= _reserve0)
                 return 0;
             else
-                amountInput -=_reserve0;
-            amountOut = IDynamicRouter02(uniV2Router).getAmountOut(amountInput, _reserve0, _reserve1);
+                amountInput -= _reserve0;
+            if (localPair) {
+                amountOut = IDynamicPair(_pair).getAmountOut(amountInput, _token, _WETH);
+            } else {
+                amountOut = IDynamicRouter02(uniV2Router).getAmountOut(amountInput, _reserve0, _reserve1);
+            }
             IDynamicPair(_pair).swap(0, amountOut, address(this), new bytes(0));
         } else {
             if (amountInput <= _reserve1)
                 return 0;
             else
                 amountInput -= _reserve1;
-            amountOut = IDynamicRouter02(uniV2Router).getAmountOut(amountInput, _reserve1, _reserve0);
+            if (localPair) {
+                amountOut = IDynamicPair(_pair).getAmountOut(amountInput, _token, _WETH);
+            } else {
+                amountOut = IDynamicRouter02(uniV2Router).getAmountOut(amountInput, _reserve1, _reserve0);
+            }    
             IDynamicPair(_pair).swap(amountOut, 0, address(this), new bytes(0));
         }
     }
@@ -228,8 +242,10 @@ contract DynamicFactory is IDynamicFactory {
     // set Router contract address
     function setRouter(address _router) external {
         require(msg.sender == feeToSetter, 'Dynamic: FORBIDDEN');
-        require(_router != address(0), "Address zero");
+        require(_router != address(0));
         uniV2Router = _router;
+        WETH = IDynamicRouter02(uniV2Router).WETH();
+        require(WETH != address(0));
     }
 
     // set fee reimbursement percentage (without decimals)
@@ -260,13 +276,11 @@ contract DynamicFactory is IDynamicFactory {
 
 
     function getColletedFees() external view returns (uint256 feeAmount) {
-        address WETH = IDynamicRouter02(uniV2Router).WETH();
         feeAmount = IERC20(WETH).balanceOf(address(this));
     }
 
     function claimFee() external returns (uint256) {
         require(msg.sender == feeTo, 'Dynamic: FORBIDDEN');
-        address WETH = IDynamicRouter02(uniV2Router).WETH();
         uint balance = IERC20(WETH).balanceOf(address(this));
         if (balance != 0) {
             IWETH(WETH).withdraw(balance);
